@@ -1,0 +1,83 @@
+# Minimal standalone Richards experiment. This folder intentionally has no
+# forcing.csv, plant_initial_pools.csv, root.csv, canopy measurements, or SCOPE settings.
+
+[simulation]
+spatial_mode = "point"          # "point" | "regional"
+point_context = "laboratory"    # "field" | "laboratory"
+
+[site]
+name = "lab_water"
+description = "Minimal one-dimensional laboratory soil-water column"
+latitude = 0.0                  # [deg N] Metadata only for this laboratory task.
+longitude = 0.0                 # [deg E] Metadata only for this laboratory task.
+elevation = 0.0                 # [m] Metadata only for this laboratory task.
+
+[time]
+start = "2021-01-01T00:00:00"
+end = "2021-01-01T01:00:00"
+dt = 3600                       # [s] Outer experiment interval.
+dt_max = 3600                   # [s] Maximum accepted tile.
+dt_min = 1                      # [s] Retry floor after non-convergence.
+clock_basis = "utc"
+utc_offset = 0
+
+[grid]
+tot_depth = 100                 # [cm] Column depth.
+NL = 20                         # [-] Computational elements.
+uniform_grid = true
+max_elements = 1000
+NS = 1                          # [-] Number of soil.csv horizon rows.
+nS = 2                          # [-] Liquid/ice endpoint slots used by the shared kernel.
+nD = 2                          # [-] Current/previous finite-element endpoints.
+
+[soil_input]
+# "sample_linear" (default): depth_cm is a sample location; interpolate to
+# element centers and hold endpoint values. "horizon_bounds": legacy tiling.
+vertical_parameter_mode = "sample_linear"
+
+[switches]
+# Keep every process switch explicit. False means its input section/file may be
+# deleted and the laboratory initializer will not read, validate, or build it.
+solve_soil_heat = false
+solve_soil_air = false
+solve_nitrogen = false
+plant_cn_cycle = false
+soil_freezing = false
+root_water_uptake = false
+root_nitrogen_uptake = false
+water_retention_model = "van_genuchten"
+soil_freezing_curve = false
+temperature_affects_retention = false
+wetting_heat_method = "prunty"
+thermal_conductivity_model = "de_vries"
+effective_thermal_properties = false
+temperature_driven_liquid_flow = false
+pressure_driven_vapor_diffusion = false
+pressure_driven_liquid_flow = false
+dual_porosity = false
+track_total_nitrogen = false
+biological_n_fixation = false
+nitrogen_input_phase = "dissolved"
+bulk_density_source = "soil"
+
+[numerics]
+NIT = 80                        # [-] Maximum Picard iterations per trial.
+tol_theta = 1e-4                # [-] Maximum unsaturated endpoint increment.
+tol_head_saturated_cm = 0.1     # [cm] Maximum saturated-node head increment.
+tol_water_mass_mm = 1e-6        # [mm/step] Actual-flux mass residual.
+hydraulic_kernel = "scalar"    # Required by the W1 laboratory driver.
+matric_kernel = "scalar"       # Required by the W1 laboratory driver.
+substep_enabled = true
+substep_grow_factor = 2.0
+substep_shrink_factor = 0.5
+substep_successes_before_grow = 4
+substep_hold_after_reject = 6
+
+[boundary]
+# One endpoint mode and one CSV value column. Public flux is positive into the
+# soil: negative top_value removes water upward (controlled evaporation).
+water_top_kind = "constant_flux"       # constant_head | variable_head | constant_flux | variable_flux | zero_flux
+# Interpolation is automatic: constant modes require a constant column;
+# variable_head is linear; variable_flux is previous-value/stepwise.
+water_bottom_kind = "zero_flux"
+water_boundary_file = "water_boundary.csv"

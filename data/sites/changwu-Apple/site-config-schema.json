@@ -1,0 +1,463 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "COMPASS site configuration",
+  "description": "Schema for every COMPASS site.toml. The workspace .taplo.toml provides one central Even Better TOML association, avoiding stale per-document schema directives. Gives autocomplete, hover documentation, and validation including typo detection via additionalProperties:false.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["simulation", "site", "time", "grid", "switches"],
+  "properties": {
+
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Select spatial assembly and the point-scale driver before optional inputs are read.",
+      "required": ["spatial_mode", "point_context"],
+      "properties": {
+        "spatial_mode": { "type": "string", "enum": ["point", "regional"], "description": "point = one vertical column; regional = multiple point columns assembled for regional execution." },
+        "point_context": { "type": "string", "enum": ["field", "laboratory"], "description": "field = natural atmosphere-canopy-soil driver; laboratory = standalone prescribed-boundary soil-water driver. Regional currently requires field." }
+      }
+    },
+
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Site identity and location.",
+      "required": ["name", "latitude", "longitude"],
+      "properties": {
+        "name": { "type": "string", "description": "Short site id (folder-friendly, e.g. 'changwu')." },
+        "description": { "type": "string", "description": "Free-text site description." },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90, "description": "[deg N] Latitude." },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180, "description": "[deg E] Longitude." },
+        "elevation": { "type": "number", "description": "[m] Elevation above sea level." }
+      }
+    },
+
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Simulation period and timestep control.",
+      "required": ["start", "end", "dt"],
+      "properties": {
+        "start": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$", "description": "Start datetime (ISO 8601, e.g. 2021-01-01T00:00:00)." },
+        "end": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$", "description": "End datetime (ISO 8601)." },
+        "dt": { "type": "number", "exclusiveMinimum": 0, "description": "[s] Outer timestep = forcing interval." },
+        "dt_max": { "type": "number", "exclusiveMinimum": 0, "description": "[s] Max adaptive timestep." },
+        "dt_min": { "type": "number", "exclusiveMinimum": 0, "description": "[s] Min adaptive substep (shrink target on failure)." },
+        "forcing_timescale": { "type": "string", "enum": ["hourly", "daily"], "description": "Forcing input cadence; daily is interpolated to hourly via diurnal method. [lTimeScale]" },
+        "clock_basis": { "type": "string", "enum": ["local_standard", "utc"], "description": "Time base of the forcing timestamps. 'local_standard' = station clock (e.g. Beijing UTC+8); 'utc' = global reanalysis (ERA5). Internal model time is always UTC; solar geometry uses UTC + lon/lat." },
+        "utc_offset": { "type": "number", "description": "[h] Clock offset from UTC for clock_basis='local_standard' (clock = UTC + utc_offset; Beijing = 8). Ignored when clock_basis='utc'." },
+        "forcing_start": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$", "description": "First timestamp in the forcing file (clock time). Defaults to 'start' if omitted; decouples the forcing origin from the simulation start." }
+      }
+    },
+
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Soil column depth and vertical discretization.",
+      "required": ["tot_depth", "NL"],
+      "properties": {
+        "tot_depth": { "type": "number", "exclusiveMinimum": 0, "description": "[cm] Total soil column depth." },
+        "NL": { "type": "integer", "minimum": 1, "description": "Initial layer count (auto-adjusted if eql_space=false)." },
+        "uniform_grid": { "type": "boolean", "description": "false = non-uniform (dense near surface), true = uniform. [lEqlspace]" },
+        "max_elements": { "type": "integer", "minimum": 1, "description": "Grid-element upper bound (memory guard)." },
+        "NS": { "type": "integer", "minimum": 1, "description": "Number of soil.csv rows (horizons or sampled depths, depending on soil_input.vertical_parameter_mode)." },
+        "nS": { "type": "integer", "minimum": 1, "description": "Sub-phases per layer (liquid + ice)." },
+        "nD": { "type": "integer", "minimum": 1, "description": "Finite-difference time levels (current + previous)." }
+      }
+    },
+
+    "soil_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Interpretation of soil.csv depth_cm when mapping static soil parameters to computational elements.",
+      "properties": {
+        "vertical_parameter_mode": {
+          "type": "string",
+          "enum": ["sample_linear", "horizon_bounds"],
+          "default": "sample_linear",
+          "description": "sample_linear (default): depth_cm is a sample location; linearly interpolate primitive parameters to element centers and hold endpoint values. horizon_bounds: depth_cm is each piecewise-constant horizon's lower boundary (legacy COMPASS tiling)."
+        }
+      }
+    },
+
+    "switches": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Physical-process on/off flags (loader maps true/false to 1/0).",
+      "properties": {
+        "solve_soil_heat": { "type": "boolean", "description": "Solve soil heat conduction (off = isothermal). [lThmrlefc]" },
+        "solve_soil_air": { "type": "boolean", "description": "Solve soil dry-air pressure (off = ignore gas phase). [lSoilairefc]" },
+        "solve_nitrogen": { "type": "boolean", "description": "Solve soil nitrogen cycle (off = no soil N). [lNefc]" },
+        "plant_cn_cycle": { "type": "boolean", "description": "Plant (above-ground) carbon-nitrogen cycle: allocation, NSC, and plant respiration (runPlantCNStep). Maps to lPlantCN." },
+        "soil_freezing": { "type": "boolean", "description": "Freeze-thaw physics (off = no ice). [lFreezing]" },
+        "root_water_uptake": { "type": "boolean", "description": "Master switch for all root-water uptake. false stages and commits zero RWU/Srt, independent of PlantCN. Maps to lRwuef." },
+        "root_nitrogen_uptake": { "type": "boolean", "description": "Master switch for all root NH4/NO3 uptake. PlantCN on uses demand-capped DAISY+Nacry; PlantCN off uses passive max(Srt,0)*C. Maps to lRsuef." },
+        "water_retention_model": { "type": "string", "enum": ["van_genuchten", "clapp_hornberger"], "description": "Soil-water retention curve. [lSWCC]" },
+        "soil_freezing_curve": { "type": "boolean", "description": "Strict soil-freezing characteristic curve. [lSFCC]" },
+        "dallamico_phase_change": { "type": "boolean", "description": "Finite-rate phase relaxation. false keeps strict SFCC instantaneous equilibrium as the sole phase-change closure. [lDallAmicoPhaseChange]" },
+        "temperature_affects_retention": { "type": "boolean", "description": "Temperature correction of water retention. [lhThmrl]" },
+        "wetting_heat_method": { "type": "string", "enum": ["prunty", "milly"], "description": "Wetting-heat method. [lW_Chg]" },
+        "thermal_conductivity_model": { "type": "string", "enum": ["de_vries", "tian", "peters_lidard", "johansen", "farouki"], "description": "Thermal conductivity model: de_vries=1 (default), tian=3, peters_lidard/johansen=2, farouki=4. [lThermCond]" },
+        "effective_thermal_properties": { "type": "boolean", "description": "Compute effective thermal conductivity + heat capacity (standard). [lThmrlCondCap]" },
+        "ebal_anderson_latent": { "type": "boolean", "description": "ebal latent-heat closure uses the Anderson formulation (legacy default true when unset). [lEbalAnderson]" },
+        "temperature_driven_liquid_flow": { "type": "boolean", "description": "Temperature-gradient liquid water flow. [lKLT_Switch]" },
+        "pressure_driven_vapor_diffusion": { "type": "boolean", "description": "Air-pressure-driven vapor diffusion. [lDVa_Switch]" },
+        "pressure_driven_liquid_flow": { "type": "boolean", "description": "Air-pressure-driven liquid water flow. [lKLa_Switch]" },
+        "dual_porosity": { "type": "boolean", "description": "HYDRUS dual-porosity (preferential flow). [lDualPor]" },
+        "track_total_nitrogen": { "type": "boolean", "description": "Total-N mass balance (liquid + adsorbed). [lNtotal]" },
+        "biological_n_fixation": { "type": "boolean", "description": "Biological nitrogen fixation. [lBNF]" },
+        "nitrogen_input_phase": { "type": "string", "enum": ["total", "dissolved"], "description": "Phase of soil_initial_profile.csv NH4/NO3. 'total' = mg/kg dry soil (e.g. KCl-extractable total mineral N), converted to liquid concentration via theta and NH4 adsorption (theta+RHOKG). 'dissolved' = mg/L soil solution, used directly as the liquid concentration." },
+        "bulk_density_source": { "type": "string", "enum": ["initial", "soil"], "description": "Which bulk density sets porosity and thermal parameters. 'initial' = soil_initial_profile.csv per-depth bulk density overrides; 'soil' = keep soil.csv per-horizon bulk density." },
+        "diurnal_temp_method": { "type": "string", "enum": ["legacy_sine", "sunrise_anchored"], "description": "Daily->hourly air-temperature disaggregation. 'legacy_sine' = fixed cosine with peak at 15:00 (MeteoData behaviour). 'sunrise_anchored' = sunrise/sunset-anchored sine in daytime (Tmin at sunrise+1.5h, Tmax near solar noon+1.5h) with linear night cooling and cross-day continuity." }
+      }
+    },
+
+    "dualporosity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Active only when switches.dual_porosity = true.",
+      "properties": {
+        "theta_s_immobile": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Immobile saturation water content (0.03-0.08)." },
+        "theta_r_immobile": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Immobile residual water content." },
+        "omega_exch": { "type": "number", "minimum": 0, "description": "[1/h] First-order exchange coefficient." }
+      }
+    },
+
+    "numerics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "NIT": { "type": "integer", "minimum": 1, "description": "Max Picard iterations per substep." },
+        "max_iter_eb": { "type": "integer", "minimum": 1, "description": "Max canopy energy-balance iterations." },
+        "tol_theta": { "type": "number", "exclusiveMinimum": 0, "description": "[-] Maximum unsaturated endpoint water-content increment." },
+        "tol_head_saturated_cm": { "type": "number", "exclusiveMinimum": 0, "description": "[cm] Maximum saturated-node pressure-head increment." },
+        "tol_water_mass_mm": { "type": "number", "exclusiveMinimum": 0, "description": "[mm/step] Maximum absolute actual-flux water-balance residual." },
+        "tol_surface_water_cm": { "type": "number", "minimum": 0, "description": "[cm/step] Maximum absolute surface-reservoir mass residual and complementarity depth ruler." },
+        "tol_energy": { "type": "number", "exclusiveMinimum": 0, "description": "[degC-equivalent] Maximum raw U-primary Picard-map defect |dU|/(dU/dT)." },
+        "tol_energy_balance_J_cm2": { "type": "number", "minimum": 0, "description": "[J/cm2/step] Maximum absolute exact soil-column internal-energy residual." },
+        "tol_air_relative": { "type": "number", "exclusiveMinimum": 0, "description": "[-] Picard dry-air convergence tolerance, max |Pg_new-Pg_old|/max(|Pg_new|,1)." },
+        "tol_air_mass_g_cm2": { "type": "number", "minimum": 0, "description": "[g/cm2/step] Maximum absolute exact soil-column dry-air mass residual." },
+        "tol_eb": { "type": "number", "exclusiveMinimum": 0, "description": "[W/m2] Canopy energy-balance closure tolerance." },
+        "soil_interface_closure_enable": { "type": "boolean", "description": "Enable outer scalar interface-temperature closure while retaining a strict Dirichlet soil top." },
+        "soil_interface_closure_tol_W_m2": { "type": "number", "minimum": 0, "description": "[W/m2] Absolute soil-reaction minus frozen-surface heat-flux tolerance." },
+        "soil_interface_closure_max_iters": { "type": "integer", "minimum": 1, "maximum": 20, "description": "Maximum guarded secant updates after the initial guess and directed probe." },
+        "soil_interface_closure_substep_retry_enable": { "type": "boolean", "description": "Retry an atmospheric heat-flux closure on finer accepted soil time tiles before fallback." },
+        "soil_interface_closure_substep_retry_factor": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1, "description": "Geometric reduction factor for heat-closure soil time-tile retries." },
+        "soil_interface_closure_substep_retry_max_levels": { "type": "integer", "minimum": 0, "maximum": 10, "description": "Maximum number of finer time-tile levels used by atmospheric heat closure." },
+        "soil_interface_closure_bounded_acceptance_enable": { "type": "boolean", "description": "Allow a fully converged finite soil trial with a non-strict but explicitly bounded interface residual." },
+        "soil_interface_closure_bounded_tol_W_m2": { "type": "number", "minimum": 0, "description": "Absolute hard cap for bounded atmospheric interface residual acceptance." },
+        "soil_interface_closure_bounded_relative_tol": { "type": "number", "minimum": 0, "maximum": 1, "description": "Additional interface-flux-relative cap for bounded residual acceptance." },
+        "hydraulic_kernel": { "type": "string", "enum": ["array", "scalar"], "description": "Hydraulic-property kernel: array (vectorized) or scalar (reference, for A/B verification)." },
+        "matric_kernel": { "type": "string", "enum": ["array", "scalar"], "description": "Richards matric-coefficient kernel: array (vectorized) or scalar (reference)." },
+        "extrapolate": { "type": "boolean", "description": "lExtrap — temporal extrapolation for initial guess." },
+        "upwind": { "type": "boolean", "description": "lUpW — upwind scheme for convective terms." },
+        "saturation_enforce": { "type": "boolean", "description": "lSat — saturation detection and enforcement." },
+        "artificial_disp": { "type": "boolean", "description": "lArtD — artificial dispersion (N-transport stabilization)." },
+        "checkpoint_interval": { "type": "integer", "minimum": 0, "description": "[steps] Resume-checkpoint cadence." },
+        "diagnostic_interval": { "type": "integer", "minimum": 0, "description": "[steps] Accepted-state diagnostic print cadence." },
+        "substep_enabled": { "type": "boolean", "description": "Enable adaptive Richards substep growth and retry shrinkage." },
+        "substep_grow_factor": { "type": "number", "exclusiveMinimum": 1, "description": "[-] Multiplier applied after sustained easy convergence." },
+        "substep_shrink_factor": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1, "description": "[-] Multiplier applied after a rejected Richards trial." },
+        "substep_successes_before_grow": { "type": "integer", "minimum": 1, "description": "[-] Consecutive accepted trials required before timestep growth." },
+        "substep_hold_after_reject": { "type": "integer", "minimum": 0, "description": "[-] Accepted trials that retain the reduced timestep after a rejection." }
+      }
+    },
+
+    "output": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+        "output_dir": { "type": "string", "description": "Run output directory. Relative paths resolve from the site folder; STEMMUS_OUTPUT overrides this." },
+        "legacy_csv": { "type": "boolean", "description": "Also write legacy CSV (PlotResults compat)." },
+        "periodic_partial": { "type": "boolean", "description": "Periodic partial-NC snapshots (off = faster)." }
+        }
+      },
+
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rin_unit_is_watt": { "type": "boolean", "description": "Incoming radiation unit: true=W/m2, false=MJ/m2/s." },
+        "z_measure": { "type": "number", "exclusiveMinimum": 0, "description": "[m] Reference height (must exceed canopy_height)." },
+        "wind_convert": { "type": "boolean", "description": "Convert raw U to z_measure via log-profile." },
+        "wind_obs_height": { "type": "number", "minimum": 0, "description": "[m] Measurement height of U." },
+        "wind_z0_grass": { "type": "number", "minimum": 0, "description": "[m] Station roughness." },
+        "wind_d_grass": { "type": "number", "minimum": 0, "description": "[m] Station displacement height." },
+        "rho_thermal_soil_dry": { "type": "number", "minimum": 0, "maximum": 1, "description": "Dry-soil thermal reflectance." },
+        "rho_thermal_soil_wet": { "type": "number", "minimum": 0, "maximum": 1, "description": "Wet-soil thermal reflectance." },
+        "Ca": { "type": "number", "exclusiveMinimum": 0, "description": "[ppm] Atmospheric CO2." },
+        "Oa": { "type": "number", "exclusiveMinimum": 0, "description": "[per-mil] Atmospheric O2 (SCOPE biochemical)." },
+        "Tav": { "type": "number", "description": "[degC] Mean annual soil temperature." },
+        "At": { "type": "number", "description": "[degC] Annual amplitude of soil temperature." }
+      }
+    },
+
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "SCOPE radiative-transfer settings (was input_data.xlsx 'options'). File references resolve to data/model_library_nc/.",
+      "properties": {
+        "simulation": { "type": "integer", "enum": [0, 1, 2], "description": "0=lookup table, 1=time series, 2=LUT-by-index." },
+        "calc_ebal": { "type": "boolean", "description": "Solve canopy energy balance." },
+        "calc_fluor": { "type": "boolean", "description": "Compute fluorescence (SIF)." },
+        "calc_PSI": { "type": "boolean", "description": "Separate PSI/PSII (false = combined fluspect)." },
+        "calc_directional": { "type": "boolean", "description": "Directional (BRDF) reflectance." },
+        "calc_planck": { "type": "boolean", "description": "Planck (spectral thermal) emission." },
+        "calc_xanthophyll_abs": { "type": "boolean", "description": "Xanthophyll absorption." },
+        "calc_rss_rbs": { "type": "boolean", "description": "Soil resistance rss/rbs." },
+        "fluorescence_model": { "type": "integer", "enum": [0, 1], "description": "0 = empirical, 1 = mechanistic." },
+        "apply_T_corr": { "type": "boolean", "description": "Temperature correction of fluspect." },
+        "soilspectrum": { "type": "integer", "enum": [0, 1], "description": "0 = file (model_library), 1 = BSM model." },
+        "rt_thermal": { "type": "integer", "enum": [0, 1], "description": "0 = fixed emissivity, 1 = from optical tail." },
+        "cca_function_of_cab": { "type": "boolean", "description": "Tie carotenoid to chlorophyll." },
+        "soil_heat_method": { "type": "integer", "enum": [0, 1, 2], "description": "0 = static force-restore; 1 = dynamic force-restore using current top-soil thermal inertia; 2 = 0.30*Rns SCOPE predictor followed by the Tss-driven soil solve." }
+      }
+    },
+
+    "model_library": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Shared SCOPE reference-data filenames (resolve to data/model_library_nc/, same for all sites).",
+      "properties": {
+        "format": { "type": "string", "enum": ["netcdf"], "description": "Authoritative shared-library format." },
+        "leaf_optics_file": { "type": "string", "pattern": "\\.nc$", "description": "PROSPECT leaf optical constants NetCDF file (nr, Kab, Kca, Kw, ...)." },
+        "atmosphere_file": { "type": "string", "pattern": "\\.nc$", "description": "MODTRAN atmospheric transmittance/radiance NetCDF file." },
+        "soil_spectrum_file": { "type": "string", "pattern": "\\.nc$", "description": "Soil reflectance library NetCDF file (used when scope.soilspectrum=0)." },
+        "leaf_angles_file": { "type": "string", "pattern": "^$|\\.nc$", "description": "OPTIONAL measured leaf inclination distribution NetCDF (13 angle bins). Empty => use [vegetation] LIDFa/LIDFb analytic Verhoef distribution." },
+        "directional_angles_file": { "type": "string", "pattern": "\\.nc$", "description": "BRDF observer-angle NetCDF under data/model_library_nc/ (var data: N x 2 [tto_deg, psi_deg]). Used when scope.calc_directional=true. Default: directional/brdf_angles2.nc." }
+      }
+    },
+
+    "leaf_optical": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "PROSPECT-PRO leaf biochemistry -> RTMo/fluspect (was input_data.xlsx 'inputdata'). Default values are SCOPE template, not yet site-calibrated.",
+      "properties": {
+        "Cab": { "type": "number", "minimum": 0, "description": "[ug/cm2] Chlorophyll a+b." },
+        "Cca": { "type": "number", "minimum": 0, "description": "[ug/cm2] Carotenoids (tied to Cab when scope.cca_function_of_cab=true)." },
+        "Cdm": { "type": "number", "minimum": 0, "description": "[g/cm2] Leaf dry matter." },
+        "Cw": { "type": "number", "minimum": 0, "description": "[cm] Leaf water equivalent thickness." },
+        "Cs": { "type": "number", "minimum": 0, "description": "[-] Senescent (brown pigment) fraction." },
+        "Cant": { "type": "number", "minimum": 0, "description": "[ug/cm2] Anthocyanins." },
+        "N_mesophyll": { "type": "number", "exclusiveMinimum": 0, "description": "[-] PROSPECT mesophyll structure parameter." },
+        "leaf_rho_thermal": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Leaf reflectance, thermal band." },
+        "leaf_tau_thermal": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Leaf transmittance, thermal band." },
+        "fqe": { "type": "number", "minimum": 0, "description": "[-] Fluorescence quantum efficiency (SIF; scope.calc_fluor)." },
+        "V2Z": { "type": "number", "minimum": 0, "maximum": 1, "description": "[0..1] Xanthophyll de-epoxidation state (Viola->Zea)." },
+        "fluor_beta": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] PSII fraction of absorbed light." },
+        "fluor_kNPQs": { "type": "number", "minimum": 0, "description": "[-] Sustained-NPQ rate constant." },
+        "fluor_qLs": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Fraction of functional PSII reaction centres." },
+        "fluor_stressfactor": { "type": "number", "minimum": 0, "description": "[-] Stress scaling on NPQ." }
+      }
+    },
+
+    "soil_optical": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Soil reflectance + evaporation resistances -> RTMo/ebal (was input_data.xlsx 'inputdata').",
+      "properties": {
+        "soil_spectrum_index": { "type": "integer", "minimum": 1, "description": "Column in model_library.soil_spectrum_file (scope.soilspectrum=0)." },
+        "rss": { "type": "number", "minimum": 0, "description": "[s/m] Soil surface resistance to evaporation (scope.calc_rss_rbs)." },
+        "rbs": { "type": "number", "minimum": 0, "description": "[s/m] Soil aerodynamic boundary-layer resistance." },
+        "rs_thermal": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Soil reflectance, thermal band." },
+        "BSM_brightness": { "type": "number", "minimum": 0, "maximum": 0.9, "description": "[-] BSM soil brightness (scope.soilspectrum=1; SCOPE2 input_borders range)." },
+        "BSM_lat": { "type": "number", "minimum": 20, "maximum": 40, "description": "[deg] BSM spectral-shape parameter (NOT the site latitude; SCOPE2 input_borders range)." },
+        "BSM_lon": { "type": "number", "minimum": 40, "maximum": 60, "description": "[deg] BSM spectral-shape parameter (NOT the site longitude; SCOPE2 input_borders range)." }
+      }
+    },
+
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Observation geometry; solar zenith (tts) is auto-computed from site lat/lon/time.",
+      "properties": {
+        "observer_zenith": { "type": "number", "minimum": 0, "maximum": 90, "description": "[deg] tto: viewing zenith angle (0 = nadir)." },
+        "relative_azimuth": { "type": "number", "minimum": 0, "maximum": 360, "description": "[deg] psi: sun-viewing relative azimuth." }
+      }
+    },
+
+    "vegetation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["PFT_type"],
+      "properties": {
+        "PFT_type": { "type": "string", "description": "PFT name; selects defaults from model_library PFT table (e.g. Apple, Spring Wheat, Temperate Corn, C3 grass, BDT temperate, NET Temperate). See getPFTParameterSet.m for the full list." },
+        "method": { "type": "string", "enum": ["verhoef", "standard", "optimal", "table"], "description": "Roughness/displacement method." },
+        "surface_type": { "type": "string", "description": "Allen Table 4.1 surface type (only used when method = table)." },
+        "crop_code": { "type": "integer", "description": "Leaf-width lookup for resistances_clm45: 1 = use leaf_width directly (static width); other codes = Tao-LAI inferred width. Loader maps to cfg.Veg.CropCode." },
+        "leaf_width": { "type": "number", "minimum": 0, "description": "[m] Characteristic leaf width (leaf boundary-layer resistance). Loader maps to cfg.Veg.w_leaf_max." },
+        "vegetation_data_file": { "type": "string", "description": "Optional site-relative CSV/XLS/XLSX vegetation observation table for LAI/hc/SAI data modes. Legacy InPlant layout: DOY, LAI, hc, Vcmax, Cab, SAI." },
+        "Cd": { "type": "number", "minimum": 0, "description": "[-] Leaf drag coefficient." },
+        "rwc": { "type": "number", "minimum": 0, "description": "[s/m] Within-canopy aerodynamic resistance." },
+        "CR": { "type": "number", "description": "Verhoef CR (method=verhoef)." },
+        "CD1": { "type": "number", "description": "Verhoef CD1." },
+        "psicor": { "type": "number", "description": "Verhoef Psi correction." },
+        "cssoil": { "type": "number", "description": "Soil surface drag coefficient." },
+        "LIDFa": { "type": "number", "minimum": -1, "maximum": 1, "description": "Verhoef leaf-inclination-distribution parameter a (|LIDFa|+|LIDFb|<=1). -1/0=erectophile, -0.35/-0.15=spherical, 1/0=planophile. Feeds RTMo/RTMt via equations.leafangles." },
+        "LIDFb": { "type": "number", "minimum": -1, "maximum": 1, "description": "Verhoef leaf-inclination-distribution parameter b (|LIDFa|+|LIDFb|<=1)." },
+        "clumping_index_source": { "type": "string", "enum": ["pft_table", "manual"], "description": "Foliage clumping-index source. pft_table uses the selected COMPASS PFT; manual uses clumping_index." },
+        "clumping_index": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "[-] Foliage clumping index Omega used only by canopy radiative transfer when clumping_index_source=manual. Omega=1 is random foliage; smaller values are more clumped." },
+        "canopy_layer_profiles": { "type": "boolean", "description": "Unified canopy-layer structure/diagnostics switch; loader maps this to legacy options.calc_vert_profiles." },
+        "canopy_air_profile_eb": { "type": "boolean", "description": "Enable layered canopy-air EB solver." },
+        "canopy_air_ta_feedback": { "type": "boolean", "description": "Feed canopy-layer Ta back to leaf EB." },
+        "canopy_air_ea_feedback": { "type": "boolean", "description": "Feed canopy-layer ea back." },
+        "canopy_air_co2_feedback": { "type": "boolean", "description": "Feed canopy-layer CO2 back." },
+        "LAI_mode": { "type": "string", "enum": ["model", "data", "constant"], "description": "LAI source." },
+        "LAI_engine": { "type": "string", "enum": ["epic_phen_mix", "leafc_sla_phen"], "description": "LAI formula when LAI_mode=model." },
+        "hc_mode": { "type": "string", "enum": ["data", "constant"], "description": "Canopy-height source." },
+        "SAI_mode": { "type": "string", "enum": ["data", "constant"], "description": "Stem area index source." },
+        "LAI_max": { "type": "number", "exclusiveMinimum": 0, "description": "[m2/m2] Numerical cap (anti-blowup), NOT physiological." },
+        "laimx": { "type": "number", "exclusiveMinimum": 0, "description": "[m2/m2] Physiological peak LAI." },
+        "LAI_constant": { "type": "number", "minimum": 0, "description": "[m2/m2] LAI when LAI_mode=constant." },
+        "canopy_height": { "type": "number", "exclusiveMinimum": 0, "description": "[m] Canopy height." },
+        "SAI_constant": { "type": "number", "minimum": 0, "description": "[m2/m2] Stem area index when SAI_mode=constant." },
+        "LAI_profile_mode": { "type": "string", "enum": ["uniform", "gaussian", "beta", "exponential"], "description": "Vertical LAI distribution." },
+        "LAI_profile_peak": { "type": "number", "minimum": 0, "maximum": 1, "description": "Relative height of peak (0=bottom, 1=top)." },
+        "LAI_profile_sigma": { "type": "number", "minimum": 0, "description": "Gaussian sigma (fraction of canopy height)." },
+        "LAI_profile_skew": { "type": "number", "description": "Beta-profile skewness." },
+        "LAI_profile_k": { "type": "number", "description": "Extinction/shape coefficient." },
+        "canopy_storage_per_LAI": { "type": "number", "minimum": 0, "description": "[mm/LAI] Max canopy water storage per LAI." },
+        "interc_F0": { "type": "number", "minimum": 0, "maximum": 1, "description": "Free throughfall fraction (Gash f_ER)." },
+        "canopy_water_scheme": { "type": "string", "enum": ["single", "four_quadrant"], "description": "Canopy reservoir + fwet model." },
+        "hydraulic_scheme": { "type": "string", "enum": ["steady_spac", "storage_from_psi", "storage_dynamic", "equilibrium", "dynamic"], "description": "Plant hydraulics: steady_spac | storage_from_psi | storage_dynamic. Legacy aliases: equilibrium, dynamic." },
+        "hydraulic_gpmax": { "type": "number", "exclusiveMinimum": 0, "description": "[m/s/MPa] Maximum whole-plant xylem conductance (SPAC)." },
+        "hydraulic_p50": { "type": "number", "description": "[MPa] 50% conductivity loss." },
+        "hydraulic_aa": { "type": "number", "description": "Manzoni vulnerability shape." },
+        "hydraulic_psil_min": { "type": "number", "description": "[MPa] Min leaf water potential." },
+        "root_hydraulic_krmax": { "type": "number", "minimum": 0, "description": "[m/s] CLM5 root tissue krmax; 0 disables the CLM5-krmax branch." },
+        "root_side_mode": { "type": "string", "enum": ["none", "clm5_krmax", "stemmus_scope_rrr"], "description": "Root-side resistance mode." },
+        "root_radial_impedance_Pr": { "type": "number", "description": "[s/m] STEMMUS-SCOPE radial impedance." },
+        "hydraulic_init_psir": { "type": "number", "description": "[MPa] Initial root water potential." },
+        "hydraulic_init_pstem": { "type": "number", "description": "[MPa] Initial stem water potential." },
+        "hydraulic_init_psil_sun": { "type": "number", "description": "[MPa] Initial sunlit leaf water potential." },
+        "hydraulic_init_psil_sha": { "type": "number", "description": "[MPa] Initial shaded leaf water potential." },
+        "root_contact_enabled": { "type": "boolean", "description": "Enable root-soil contact resistance." },
+        "root_contact_psi_start": { "type": "number", "description": "[MPa] Soil psi where contact resistance begins." },
+        "root_contact_psi_end": { "type": "number", "description": "[MPa] Soil psi at full contact resistance." },
+        "retention_slope_root": { "type": "number", "description": "[1/m] PV-curve slope, root (loader maps to dyn_a_retention_root)." },
+        "retention_slope_stem": { "type": "number", "description": "[1/m] PV-curve slope, stem (loader maps to dyn_a_retention_stem)." },
+        "retention_slope_leaf": { "type": "number", "description": "[1/m] PV-curve slope, leaf (loader maps to dyn_a_retention_leaf)." },
+        "water_capacity_root": { "type": "number", "minimum": 0, "description": "[m] Root water storage capacity (loader maps to dyn_W_capacity_root)." },
+        "water_capacity_stem": { "type": "number", "minimum": 0, "description": "[m] Stem water storage capacity, dominant capacitor (loader maps to dyn_W_capacity_stem)." },
+        "water_capacity_leaf": { "type": "number", "minimum": 0, "description": "[m] Leaf water storage capacity (loader maps to dyn_W_capacity_leaf)." },
+        "path_root_to_stem": { "type": "number", "minimum": 0, "description": "[m] Root->stem water path length, gravity correction (loader maps to dyn_dz_rs)." },
+        "path_stem_to_leaf": { "type": "number", "minimum": 0, "description": "[m] Stem->leaf water path length, gravity correction (loader maps to dyn_dz_sl)." },
+        "stem_capacitance_lag": { "type": "number", "minimum": 0, "description": "[s] Stem storage lag time constant (0 = instantaneous; loader maps to dyn_tau_stem_s)." },
+        "tree_DBH": { "type": "number", "exclusiveMinimum": 0, "description": "[cm] Diameter at breast height; only used to estimate gpmax when hydraulic_gpmax <= 0." },
+        "tree_CAH": { "type": "number", "exclusiveMinimum": 0, "description": "[m2] Crown area per tree; only used to estimate gpmax when hydraulic_gpmax <= 0." },
+        "tree_Ksmax": { "type": "number", "exclusiveMinimum": 0, "description": "[kg/m/s/MPa] Max stem hydraulic conductance; only used to estimate gpmax when hydraulic_gpmax <= 0." },
+        "root_type": { "type": "integer", "description": "Root distribution function index." },
+        "root_max_depth": { "type": "number", "exclusiveMinimum": 0, "description": "[cm] Maximum rooting depth." },
+        "root_rroot_mm": { "type": "number", "exclusiveMinimum": 0, "description": "[mm] Mean root radius." },
+        "root_dist_mode": { "type": "integer", "enum": [0, 1], "description": "0=Jackson, 1=measured root.csv." },
+        "root_measured_file": { "type": "string", "description": "Measured root-length-density CSV when root_dist_mode=1." },
+        "gsr_formula": { "type": "string", "enum": ["katul", "clm5", "radial_darcy_series"], "description": "Soil-root conductance formula." },
+        "T_BASE": { "type": "number", "description": "[degC] GDD base temperature." },
+        "T_OPT": { "type": "number", "description": "[degC] GDD optimal temperature." },
+        "PHU": { "type": "number", "exclusiveMinimum": 0, "description": "[degC*day] Total heat units to maturity." },
+        "GMHU": { "type": "number", "minimum": 0, "description": "[degC*day] Heat units at green-up." },
+        "sowing_day": { "type": "integer", "minimum": 1, "maximum": 366, "description": "[DOY] Sowing/budburst day." },
+        "FRGW1": { "type": "number", "description": "Fraction of PHU at first LAI shape point." },
+        "LAIMX1": { "type": "number", "description": "LAI fraction at FRGW1." },
+        "FRGW2": { "type": "number", "description": "Fraction of PHU at second LAI shape point." },
+        "LAIMX2": { "type": "number", "description": "LAI fraction at FRGW2." },
+        "DLAI": { "type": "number", "description": "Fraction of PHU when LAI begins to decline." },
+        "ALAI_MIN": { "type": "number", "description": "Minimum LAI (crop death / harvest)." },
+        "beta_decay": { "type": "number", "description": "LAI decline rate after DLAI." },
+        "yr_cur": { "type": "integer", "description": "Current year in rotation (soil-N init)." },
+        "yr_full": { "type": "integer", "description": "Full rotation length (years)." },
+        "root_solver_tol": { "type": "number", "exclusiveMinimum": 0, "description": "[mg/L] Bisection convergence tolerance." },
+        "root_solver_max_iter": { "type": "integer", "minimum": 1, "description": "Bisection max iterations." },
+        "cn_coupling_mode": { "type": "string", "enum": ["flexible_cn"], "description": "C/N coupling mode (CLM5 FlexibleCN, C-dominant)." },
+        "cn_flex_offset": { "type": "number", "minimum": 0, "description": "[gC/gN] C:N elasticity half-width." },
+        "photo_type": { "type": "string", "enum": ["C3", "C4"], "description": "Photosynthetic pathway." },
+        "vcmax_source": { "type": "string", "enum": ["pft_table", "manual"], "description": "Vcmax25 base source; LUNA overrides daily when luna=true. Loader maps pft_table->0, manual->2 (vcmax_flag)." },
+        "vcmax_manual": { "type": "number", "exclusiveMinimum": 0, "description": "[umol/m2/s] Static Vcmax25 (overridden by LUNA)." },
+        "luna": { "type": "boolean", "description": "LUNA N->Vcmax feedback (needs switches.nitrogen)." },
+        "cab_from_luna": { "type": "boolean", "description": "Drive leaf Cab from LUNA dynamic N." },
+        "photo_Rd_C3": { "type": "number", "minimum": 0, "description": "Rd25/Vcmax25 ratio (C3)." },
+        "photo_Rd_C4": { "type": "number", "minimum": 0, "description": "Rd25/Vcmax25 ratio (C4)." },
+        "leaf_resp_method": { "type": "string", "enum": ["vcmax_proportional", "atkin2015"], "description": "Leaf Rd25 base method. Loader maps vcmax_proportional->0, atkin2015->2." },
+        "gs_g0": { "type": "number", "minimum": 0, "description": "[mol/m2/s] Minimum (residual) stomatal conductance." },
+        "gs_g1": { "type": "number", "minimum": 0, "description": "[kPa^0.5] Medlyn slope." },
+        "gs_iter_init": { "type": "number", "description": "Initial gs guess." },
+        "heat_gs_enable": { "type": "boolean", "description": "Optional additive heat-induced gs after Medlyn. Default false (production off)." },
+        "heat_gs_T_on_C": { "type": "number", "description": "[degC] Leaf temperature where heat gs starts." },
+        "heat_gs_T_full_C": { "type": "number", "description": "[degC] Leaf temperature where heat gs is full." },
+        "heat_gs_max": { "type": "number", "minimum": 0, "description": "[mol/m2/s] Max additive heat gs when all gates open." },
+        "heat_gs_wt_off": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Hydraulic sfactor below which g_heat=0." },
+        "heat_gs_wt_on": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Hydraulic sfactor for full water gate." },
+        "heat_gs_D_lo_kPa": { "type": "number", "minimum": 0, "description": "[kPa] VPD where heat gate starts closing." },
+        "heat_gs_D_hi_kPa": { "type": "number", "minimum": 0, "description": "[kPa] VPD at/above which heat gate is closed." },
+        "heat_gs_A_lo": { "type": "number", "minimum": 0, "description": "[umol/m2/s] An low end of photosynthesis gate." },
+        "heat_gs_A_hi": { "type": "number", "minimum": 0, "description": "[umol/m2/s] An high end of photosynthesis gate." },
+        "heat_gs_cap": { "type": "number", "minimum": 0, "description": "[mol/m2/s] Total gs cap when heat_gs_enable=true." }
+      }
+    },
+
+    "snow": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ClimaLand v1.0 bulk snow and its total-precipitation phase adapter.",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "precipitation_phase_model": { "type": "string", "enum": ["climaland_jennings2018"], "description": "Jennings et al. temperature-relative-humidity rain/snow partition used by ClimaLand neural-snow forcing tools." },
+        "minimum_density_kg_m3": { "type": "number", "exclusiveMinimum": 0, "description": "[kg m-3] Minimum bulk snow density." },
+        "albedo": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Snow broadband albedo." },
+        "emissivity": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Snow longwave emissivity." },
+        "liquid_holding_capacity": { "type": "number", "minimum": 0, "maximum": 1, "description": "[-] Retained liquid mass-capacity factor." },
+        "wet_snow_hydraulic_conductivity_m_s": { "type": "number", "exclusiveMinimum": 0, "description": "[m s-1] Drainage conductivity for excess snow liquid." },
+        "regularization_swe_m": { "type": "number", "exclusiveMinimum": 0, "description": "[m] SWE regularization used by ClimaLand bulk temperature and phase change." },
+        "cover_depth_scale_m": { "type": "number", "exclusiveMinimum": 0, "description": "[m] Wu-Wu snow-cover depth scale." },
+        "cover_fraction_beta": { "type": "number", "exclusiveMinimum": 0, "description": "[-] Wu-Wu snow-cover shape coefficient." },
+        "minimum_exchange_depth_m": { "type": "number", "exclusiveMinimum": 0, "description": "[m] Minimum snow depth in the snow-soil conductive exchange denominator." }
+      }
+    },
+
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "All boundary settings are kept in one [boundary] table. Each water kind selects constant or variable head/flux behavior; variable interpolation is automatic.",
+      "required": ["water_top_kind", "water_bottom_kind", "heat_top_kind", "heat_bottom_kind", "heat_top_value", "heat_bottom_value", "dry_air_top_kind", "dry_air_bottom_kind", "dry_air_top_value", "dry_air_bottom_value"],
+      "properties": {
+        "water_boundary_file": { "type": "string", "description": "Site-relative or absolute prescribed water-boundary CSV path; defaults to water_boundary.csv." },
+        "water_top_kind": { "type": "string", "enum": ["atmospheric", "constant_head", "variable_head", "constant_flux", "variable_flux", "zero_flux"] },
+        "water_bottom_kind": { "type": "string", "enum": ["free_drainage", "constant_head", "variable_head", "constant_flux", "variable_flux", "zero_flux"] },
+        "surface_water_capacity_cm": { "type": "number", "minimum": 0, "description": "[cm] Maximum retained liquid depression storage for an atmospheric top boundary; zero gives immediate runoff at h_surface=0." },
+        "heat_top_kind": { "type": "string", "enum": ["atmospheric", "surface_energy_response", "surface_temperature", "specified_heat_flux"] },
+        "heat_bottom_kind": { "type": "string", "enum": ["seasonal_bottom_temperature", "fixed_temperature", "specified_heat_flux", "free_drainage_internal_energy"] },
+        "heat_top_value": { "type": "number", "description": "[J cm-2 s-1] Used only for a specified top total-energy flux." },
+        "heat_bottom_value": { "type": "number", "description": "[degC] Fixed temperature or [J cm-2 s-1] specified total-energy flux, selected by heat_bottom_kind; inactive for free_drainage_internal_energy." },
+        "dry_air_top_kind": { "type": "string", "enum": ["fixed_pressure", "specified_mass_flux", "atmospheric_pressure"] },
+        "dry_air_bottom_kind": { "type": "string", "enum": ["hydrostatic_pressure", "specified_mass_flux", "zero_mass_flux"] },
+        "dry_air_top_value": { "type": "number", "description": "[Pa] Fixed pressure or [g cm-2 s-1] specified mass flux, selected by dry_air_top_kind." },
+        "dry_air_bottom_value": { "type": "number", "description": "[g cm-2 s-1] Used only for a specified bottom dry-air mass flux." },
+        "nh4_top": { "type": "integer", "enum": [1, 2, 3, 4] },
+        "nh4_bottom": { "type": "integer", "enum": [1, 2, 3, 4] },
+        "nh4_top_value": { "type": "number", "description": "[mol/m3] Top NH4 Dirichlet value." },
+        "nh4_bottom_value": { "type": "number", "description": "[mol/m3] Bottom NH4 Dirichlet value." },
+        "no3_top": { "type": "integer", "enum": [1, 2, 3, 4] },
+        "no3_bottom": { "type": "integer", "enum": [1, 2, 3, 4] },
+        "no3_top_value": { "type": "number", "description": "[mol/m3] Top NO3 Dirichlet value." },
+        "no3_bottom_value": { "type": "number", "description": "[mol/m3] Bottom NO3 Dirichlet value." }
+      }
+    },
+
+    "fertilization": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Fertilizer events; arrays align by index.",
+      "properties": {
+        "events_time": { "type": "array", "items": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$" }, "description": "Event datetimes (ISO 8601)." },
+        "events_amount": { "type": "array", "items": { "type": "number", "minimum": 0 }, "description": "[kgN/ha] N per event." },
+        "events_type": { "type": "array", "items": { "type": "string", "enum": ["urea", "ammonium", "nitrate", "ammonium_nitrate", "lime_nitrogen", "custom"] }, "description": "Fertilizer form per event." },
+        "depth_start": { "type": "number", "minimum": 0, "description": "[cm] Injection layer top." },
+        "depth_end": { "type": "number", "minimum": 0, "description": "[cm] Injection layer bottom." },
+        "NH4_ratio": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "description": "Fraction of event N as NH4." },
+        "NO3_ratio": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "description": "Fraction of event N as NO3." },
+        "urea_ratio": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "description": "Fraction of event N as urea." },
+        "pool_entry": { "type": "array", "items": { "type": "string", "enum": ["nh4_granule", "nh4_liquid", "no3_liquid", "urea"] }, "description": "Target state pool per event (optional; defaults from events_type). nh4_granule=solid NH4 slow-release, nh4_liquid=dissolved NH4, no3_liquid=nitrate, urea=urea." }
+      }
+    }
+  }
+}

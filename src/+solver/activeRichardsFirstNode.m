@@ -1,0 +1,43 @@
+function firstNode = activeRichardsFirstNode(built)
+%ACTIVERICHARDSFIRSTNODE  Return the first node owned by the Richards domain.
+%
+%   Inputs:
+%     built [in] struct Accepted model shell with a frozen groundwater driver.
+%
+%   Returns:
+%     firstNode [out] [-] Bottom-up node index of the first active Richards
+%       finite element. It is 1 without MODFLOW/BMI coupling.
+%
+%   Physical contract:
+%     An external water table removes nodes below its interface from COMPASS
+%     water storage and root-sink accounting. The interface node must leave at
+%     least one finite element above it, hence firstNode is in [1, NL].
+%
+%   Reference: docs/architecture/modflow_external_boundary_contract.md,
+%   section "Water quantity".
+% Editor: Jizixing Zhu; Date: 2026-07-20.
+    assert(isstruct(built) && isfield(built, 'domain') ...
+            && isfield(built.domain, 'NL'), ...
+        'solver:activeRichardsFirstNode:missingDomain', ...
+        'The soil domain is required to resolve the Richards control volume.');
+    firstNode = 1;
+    if ~isfield(built, 'workspace') ...
+            || ~isfield(built.workspace, 'boundary') ...
+            || ~isfield(built.workspace.boundary, 'groundwater_driver')
+        return;
+    end
+    driver = built.workspace.boundary.groundwater_driver;
+    if ~isstruct(driver) || ~isfield(driver, 'GroundwaterCoupling') ...
+            || driver.GroundwaterCoupling ~= 1
+        return;
+    end
+    assert(isfield(driver, 'indexBotmLayer') ...
+            && isscalar(driver.indexBotmLayer) ...
+            && isfinite(driver.indexBotmLayer) ...
+            && driver.indexBotmLayer == floor(driver.indexBotmLayer) ...
+            && driver.indexBotmLayer >= 1 ...
+            && driver.indexBotmLayer <= built.domain.NL, ...
+        'solver:activeRichardsFirstNode:badActiveNode', ...
+        'MODFLOW active_node must be an integer in [1, NL].');
+    firstNode = double(driver.indexBotmLayer);
+end

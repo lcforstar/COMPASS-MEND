@@ -1,0 +1,162 @@
+# --- Output directories ---
+/output/
+/outputs/
+data/output/
+data/output_*/
+data/outputParameters/
+data/output_full_year*/
+data/end_time_day.mat
+data/start_time_day.mat
+data/optimization_results.mat
+
+# --- Temp / backup files ---
+*.bak
+*.bak_*
+*.tmp
+.tmp_recover/
+.matlab_tmp/
+.matlab_pref_tmp/
+backups/
+baselines/
+
+# --- MATLAB junk ---
+*.asv
+*.m~
+slprj/
+sccprj/
+*.mexw64
+*.mexa64
+*.mexmaci64
+
+# --- Claude / IDE ---
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.vscode/
+.idea/
+
+# --- Diagnostic outputs (kept locally, not version-controlled) ---
+diag_*.txt
+rain_diagnostic_diary*.txt
+rain_diary_*.txt
+flux_vars_*.csv
+matlab_crash_dump.*
+
+# --- Local checkpoints ---
+data/checkpoint*/
+data/storm_initial_state/
+data/InitialConditions_storm_pre.xlsx
+data/InitialConditions_yearstart*.xlsx*
+data/InitialConditions.before_*.xlsx
+data/InitialConditions_aug*.xlsx
+data/InitialConditions_jan01_backup.xlsx
+data/InitialConditions_before_*.xlsx
+data/InitialConditions_oct02_for_step6612.xlsx
+data/config_time.txt.before_*
+data/calibration_*/
+data/root/
+data/references/*.pdf
+data/Meterology data2021-2022.xls
+data/co2_*.txt
+data/config_*_year.txt*
+data/config_*.bak*
+
+# --- Skill / Plan artifacts ---
+*.draft.md
+
+# --- Logs ---
+*_log.txt
+*.log
+logs/
+data/output_full_year*
+
+# --- Local development and validation material ---
+/.codex_tmp/
+/.claude/
+/tests/
+/tools/
+/PlotResults/
+data/output_v*wl*.txt
+
+# --- Reference / experimental copies ---
+data/原版代码数据/
+data/原版代码数据*/
+experiments/
+# docs/figures/ 不再忽略 — 论文图（SVG/PNG）需要版本控制
+# 仍忽略大型临时图和诊断输出图（数据量大，可再生）
+docs/figures/fullyear_*/
+docs/figures/v*_partial*
+docs/figures/v30_single_yearfull/
+docs/figures/v30_4q_yearfull/
+docs/figures/v30_yearfull_v8/
+docs/figures/v31_full/
+docs/figures/v32_full/
+docs/figures/v33_yearfull_logsor_tol50/
+docs/figures/leaf_potential_relationships/
+docs/figures/PlotResults/
+docs/figures/PlotResults_oct/
+docs/*.pptx
+docs/ebal_ppt.py
+
+
+# 2026-05-18: PF closure venv (local Python env, don't commit)
+venv_pf/
+.tmp_old_xlsx.xlsx
++v10_hydrofusion/
++v10_hydrofusion_matmul/
+
+/output_*/
+*_console.log
+
+# --- Local data products / references / satellite / cache (not version-controlled) ---
+data/references/
+data/VODCA/
+data/SMOS_IC_2021/
+data/MTDCA/
+data/moflux/
+**/__pycache__/
+external/
+docs/figures/
+tools/figs/
+tools/imci_validation/
+data/*.csv
+data/*.png
+data/*.nc
+data/*.xlsx
+data/_stage2d_*.txt
+tools/_carbon_overview_R.csv
+
+# [2026-06-20] microwave VOD 诊断输出 + 图 (保留 *.m / *.py 脚本)
+tools/microwave/*.csv
+tools/microwave/*.png
+tools/microwave/*.pdf
+tools/microwave/*.txt
+tools/microwave/*.mat
+tools/microwave/figures/
+tools/microwave/sensitivity/
+
+# --- Agent / local scratch (not version-controlled) [2026-07-11] ---
+tmp/
+.codex_tmp/
+.codex_deps/
+.julia_depot/
+
+# --- Large measured field datasets (kept out of git) [2026-07-11] ---
+data/measured/
+
+# --- Large SCOPE spectral / atmosphere libraries (provision externally) [2026-07-11] ---
+data/model_library/
+data/model_library_nc/
+
+# --- Misplaced literature / scratch dumped under site folders [2026-07-11] ---
+data/sites/*/最近读文献/
+data/sites/*/tmp/
+
+# --- Local MATLAB / agent runtime artifacts (not version-controlled) [2026-07-16] ---
+.claude_resources.json
+.matlab_codex_pref/
+.tmp_matlab_prefs/
+.matlab_pref_*/
+.matlab_prefs/
+data/u_step4_audit.err
+data/u_step4_audit.out
+data/yearly_parity_resources.json

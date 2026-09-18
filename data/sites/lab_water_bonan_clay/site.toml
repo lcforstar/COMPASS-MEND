@@ -1,0 +1,78 @@
+# Homogeneous clay Richards benchmark used by ClimaLand against Bonan's model.
+
+[simulation]
+spatial_mode = "point"
+point_context = "laboratory"
+
+[site]
+name = "lab_water_bonan_clay"
+description = "Bonan homogeneous clay infiltration and drainage benchmark"
+latitude = 0.0
+longitude = 0.0
+elevation = 0.0
+
+[time]
+start = "2021-01-01T00:00:00"
+end = "2021-01-12T13:46:40"   # 1,000,000 s after start.
+dt = 1000
+dt_max = 1000
+dt_min = 3.90625
+clock_basis = "utc"
+utc_offset = 0
+
+[grid]
+tot_depth = 150
+NL = 150
+uniform_grid = true
+max_elements = 1000
+NS = 1
+nS = 2
+nD = 2
+
+[soil_input]
+# "sample_linear" (default): depth_cm is a sample location; interpolate to
+# element centers and hold endpoint values. "horizon_bounds": legacy tiling.
+vertical_parameter_mode = "sample_linear"
+
+[switches]
+solve_soil_heat = false
+solve_soil_air = false
+solve_nitrogen = false
+plant_cn_cycle = false
+soil_freezing = false
+root_water_uptake = false
+root_nitrogen_uptake = false
+water_retention_model = "van_genuchten"
+soil_freezing_curve = false
+temperature_affects_retention = false
+wetting_heat_method = "prunty"
+thermal_conductivity_model = "de_vries"
+effective_thermal_properties = false
+temperature_driven_liquid_flow = false
+pressure_driven_vapor_diffusion = false
+pressure_driven_liquid_flow = false
+dual_porosity = false
+track_total_nitrogen = false
+biological_n_fixation = false
+nitrogen_input_phase = "dissolved"
+bulk_density_source = "soil"
+
+[numerics]
+NIT = 80
+tol_theta = 1e-4                # [-] Maximum unsaturated endpoint increment.
+tol_head_saturated_cm = 0.1     # [cm] Maximum saturated-node head increment.
+tol_water_mass_mm = 1e-6        # [mm/step] Actual-flux mass residual.
+hydraulic_kernel = "scalar"
+matric_kernel = "scalar"
+substep_enabled = true
+substep_grow_factor = 2.0
+substep_shrink_factor = 0.5
+substep_successes_before_grow = 4
+substep_hold_after_reject = 6
+
+[boundary]
+# ClimaLand prescribes theta=0.494. Under the frozen VG curve this is the
+# equivalent pressure head -1.4288210312335 cm used by COMPASS and HYDRUS.
+water_top_kind = "constant_head"
+water_bottom_kind = "free_drainage"
+water_boundary_file = "water_boundary.csv"

@@ -1,0 +1,507 @@
+# =============================================================================
+#  COMPASS Site Configuration
+#
+#  Author:  Jizixing Zhu
+#  Contact: 3100362274@nwafu.edu.cn
+#
+#  Function:
+#    One self-contained configuration for a single COMPASS site run. It stores
+#    scalar settings and process switches; tabular and array inputs remain in
+#    the site folder. io.loadSite reads the following files when their owning
+#    component is enabled by the simulation plan:
+#      soil.csv            soil hydraulic, thermal, and nitrogen parameters
+#      soil_initial_profile.csv  initial theta, T, gas pressure, bulk density, NH4, NO3
+#      plant_initial_pools.csv   initial prognostic plant carbon and nitrogen pools
+#      root.csv            measured root-length-density profile
+#      forcing.csv         meteorological forcing time series
+#      water_boundary.csv  prescribed water-head or water-flux time series
+#      canopy_measurements.csv   measured LAI and canopy-structure time series
+#
+#    SCOPE also reads the shared NetCDF libraries selected in [model_library]:
+#      data/model_library_nc/leaf_optics/       leaf optical constants
+#      data/model_library_nc/atmosphere/        atmospheric transfer spectra
+#      data/model_library_nc/soil_spectrum/     soil reflectance spectra
+#
+#    Format: TOML. on/off flags are true/false (loader maps to 1/0); units are in
+#    # comments. No absolute paths; everything resolves relative to the site folder.
+#    site-config-schema.json validates this file at load time and in VS Code;
+#    the workspace .taplo.toml associates the schema with every site.toml.
+# =============================================================================
+
+[simulation]
+# Spatial assembly: "point" uses one vertical column; "regional" assembles many columns.
+spatial_mode = "point"
+# Point driver: "field" uses meteorology, canopy, plants, and the natural surface;
+# "laboratory" uses only soil, initial state, and prescribed water boundaries.
+point_context = "field"
+
+[site]
+name        = "changwu"
+description = "Changwu apple orchard, Loess Plateau, China"
+latitude    = 35.2497      # [deg N]
+longitude   = 107.6877     # [deg E]
+elevation   = 1220         # [m]
+
+[time]
+start             = "2021-01-01T00:00:00"
+end               = "2022-01-01T00:00:00"
+dt                = 3600        # [s] outer step = forcing interval
+dt_max            = 3600        # [s] max adaptive timestep
+dt_min            = 0.864       # [s] min adaptive substep
+forcing_timescale = "daily"     # forcing input cadence: "hourly" | "daily" (daily -> diurnal interp)
+clock_basis       = "local_standard"  # forcing timestamp base: "local_standard" (station clock) | "utc" (global reanalysis)
+utc_offset        = 8           # [h] local_standard clock = UTC + utc_offset (Changwu = Beijing UTC+8); ignored when clock_basis="utc"
+forcing_start     = "2021-01-01T00:00:00"  # first timestamp in forcing.csv (clock); defaults to start
+
+[output]
+output_dir       = "../../output/output_initialized"  # run output directory, relative to this site folder
+legacy_csv       = false       # also write legacy CSV (PlotResults compat)
+periodic_partial = false       # periodic partial-NC snapshots (off = faster)
+
+[grid]
+tot_depth    = 1000        # [cm] total soil column depth
+NL           = 200         # soil layer count; only used when uniform_grid=true; in non-uniform mode Dtrmn_Z auto-determines layers from tot_depth (NL ignored)
+uniform_grid = false       # false = non-uniform (dense near surface), true = uniform
+max_elements = 5000        # grid-element upper bound (memory guard)
+NS           = 7           # soil phases tracked
+nS           = 2           # sub-phases per layer (liquid + ice)
+nD           = 2           # finite-difference time levels (current + previous)
+
+[soil_input]
+# soil.csv depth semantics. "sample_linear" (default) treats depth_cm as a
+# measurement location and interpolates primitive parameters to element centers.
+# "horizon_bounds" treats depth_cm as each constant horizon's lower boundary.
+vertical_parameter_mode = "sample_linear"  # Interpolate measured soil parameters to layer centers.
+
+[environment]
+rin_unit_is_watt  = true       # incoming radiation: true=W/m2, false=MJ/m2/s
+z_measure         = 10         # [m] reference height (must exceed canopy_height)
+# --- wind height conversion (log-profile to z_measure) ---
+wind_convert      = true       # convert raw U to z_measure via log-profile
+wind_obs_height   = 2.0        # [m] measurement height of U (Changwu U2 = 2 m)
+wind_z0_grass     = 0.03       # [m] station roughness (short grass WMO)
+wind_d_grass      = 0.0        # [m] station displacement height
+# --- soil thermal optical properties ---
+rho_thermal_soil_dry = 0.086
+rho_thermal_soil_wet = 0.020
+# --- atmospheric CO2 + soil-T climatology ---
+Ca  = 415    # [ppm]    atmospheric CO2 (2021)
+Oa  = 209    # [per-mil] atmospheric O2 (SCOPE biochemical)
+Tav = 9.3    # [degC] mean annual soil temperature
+At  = 11.46  # [degC] annual amplitude of soil temperature
+
+[switches]
+# --- core equations: what the model solves ---
+solve_soil_heat   = true   # soil heat conduction (off = isothermal)
+solve_soil_air    = true   # soil dry-air pressure (off = ignore gas phase)
+solve_nitrogen    = true   # soil nitrogen cycle (off = no soil N)
+plant_cn_cycle    = true   # plant (above-ground) carbon-nitrogen cycle: allocation, NSC, plant respiration
+soil_freezing     = true   # freeze-thaw physics (off = no ice)
+root_water_uptake = true   # [lRwuef] master switch for all root-water uptake; false stages and commits zero RWU/Srt, independent of PlantCN
+root_nitrogen_uptake = true # [lRsuef] all root N uptake; PlantCN on=demand DAISY+Nacry, off=passive max(Srt,0)*C
+# --- soil water retention / freezing curves ---
+water_retention_model         = "van_genuchten"  # "van_genuchten" | "clapp_hornberger"
+soil_freezing_curve           = true             # strict soil-freezing characteristic curve
+dallamico_phase_change        = false            # keep strict SFCC instantaneous equilibrium as the sole phase-change closure
+temperature_affects_retention = true             # temperature correction of water retention
+# --- heat: methods + couplings ---
+wetting_heat_method          = "prunty"  # "prunty" | "milly"
+thermal_conductivity_model   = "de_vries" # "de_vries" | "tian" | "peters_lidard" | "johansen" | "farouki"
+effective_thermal_properties = true      # compute effective thermal conductivity + heat capacity (standard)
+ebal_anderson_latent         = true      # ebal latent-heat closure uses the Anderson formulation (legacy default true) [lEbalAnderson]
+bulk_density_source          = "initial" # which bulk density sets porosity/thermal: "initial" (soil_initial_profile.csv bd overrides) | "soil" (soil.csv per-horizon bd)
+diurnal_temp_method          = "sunrise_anchored" # daily->hourly air-temp disaggregation: "legacy_sine" (fixed cos peak 15:00, MeteoData) | "sunrise_anchored" (sunrise/sunset sine + linear night cooling)
+# --- soil water: transport ---
+temperature_driven_liquid_flow  = true   # temperature-gradient liquid water flow
+pressure_driven_vapor_diffusion = true   # air-pressure-driven vapor diffusion
+pressure_driven_liquid_flow     = true   # air-pressure-driven liquid water flow
+dual_porosity                   = false  # HYDRUS dual-porosity (preferential flow)
+# --- biogeochemistry (C/N cycle settings) ---
+track_total_nitrogen  = true   # total-N mass balance (liquid + adsorbed)
+biological_n_fixation = false  # biological nitrogen fixation
+nitrogen_input_phase  = "total"  # soil_initial_profile.csv NH4/NO3 phase: "total" (mg/kg dry soil, e.g. KCl-extractable -> converted to liquid via theta & adsorption) | "dissolved" (mg/L soil solution, used directly)
+
+[dualporosity]                 # active only when switches.dual_porosity = true
+theta_s_immobile = 0.05        # [-]   immobile saturation water content (0.03-0.08)
+theta_r_immobile = 0.0         # [-]   immobile residual water content
+omega_exch       = 0.01        # [1/h] first-order exchange coefficient
+
+[snow]
+# ClimaLand v1.0 bulk SnowModel: prognostic total SWE, retained liquid water,
+# and internal energy. Total post-canopy precipitation is split with the
+# Jennings et al. (2018) temperature-relative-humidity relation used by
+# ClimaLand's neural-snow forcing tools; it is not a hard 0-degC threshold.
+enabled = true
+precipitation_phase_model = "climaland_jennings2018"
+minimum_density_kg_m3 = 200.0
+albedo = 0.8
+emissivity = 0.97
+liquid_holding_capacity = 0.08
+wet_snow_hydraulic_conductivity_m_s = 0.001
+regularization_swe_m = 0.1
+cover_depth_scale_m = 0.106
+cover_fraction_beta = 1.81
+minimum_exchange_depth_m = 0.1
+
+[boundary]
+# Select all soil boundary conditions here. The current combination is suited
+# to a field orchard with natural surface forcing and a deep groundwater table:
+#   water: atmospheric infiltration/evaporation + free drainage
+#   heat: atmospheric surface coupling + free-drainage liquid energy export
+#   dry air: atmospheric surface pressure + hydrostatic bottom pressure
+
+# --- Water boundary ---------------------------------------------------------
+# Top choices:
+#   atmospheric   Natural rainfall, infiltration, and evaporation (field default)
+#   constant_head / variable_head   Known ponding head or laboratory head
+#   constant_flux / variable_flux   Known infiltration, evaporation, or irrigation
+#   zero_flux     Sealed surface with no water exchange
+# Bottom choices:
+#   free_drainage Gravity drainage above a deep water table (field default)
+#   constant_head / variable_head   Known groundwater head
+#   constant_flux / variable_flux   Known recharge or drainage flux
+#   zero_flux     Impermeable lower boundary
+#
+# For prescribed heads or fluxes, edit time_s, top_value, and bottom_value in
+# water_boundary.csv. Head uses [cm]; flux uses [cm/s]. A constant mode requires
+# one repeated value. Flux is positive into the soil: positive top flux is
+# downward infiltration, negative top flux is evaporation, positive bottom flux
+# is upward recharge, and negative bottom flux is downward drainage.
+# variable_head uses linear interpolation. variable_flux is piecewise constant
+# and integrated exactly. time_s starts at simulation time zero and must cover
+# the complete simulation period.
+water_boundary_file = "water_boundary.csv"
+water_top_kind    = "atmospheric"
+water_bottom_kind = "free_drainage"
+# Maximum liquid depression storage [cm]. Zero means no retained pond: once
+# the atmospheric flux would make h_surface positive, h_surface=0 and the
+# excess becomes runoff. Use a measured/calibrated microtopographic depth to
+# retain ponding; do not substitute saturated conductivity for this capacity.
+surface_water_capacity_cm = 0.0
+
+# --- Heat boundary ----------------------------------------------------------
+# Top choices:
+#   surface_energy_response   Experimental natural-surface boundary. Insert the
+#                             temperature-linearized bare/snow external-energy
+#                             response into the U-primary top row; SCOPE's
+#                             empirical force-restore G remains diagnostic.
+#   surface_temperature       Prescribe the frozen SCOPE Tss [degC]
+#                             (production operator-split contract)
+#   atmospheric              Match the frozen surface-energy tangent to the
+#                             upper-20-cm dynamic soil heat response, then
+#                             prescribe the unique matched G for this hour
+#   specified_heat_flux       Use heat_top_value [J cm-2 s-1]
+# Bottom choices:
+#   seasonal_bottom_temperature  Use the calculated seasonal Tbh (field default)
+#   fixed_temperature            Use heat_bottom_value [degC]
+#   specified_heat_flux          Use heat_bottom_value [J cm-2 s-1]
+#   free_drainage_internal_energy  Let bottom drainage carry liquid sensible
+#                                  energy using the coupled bottom T and QMB;
+#                                  heat_bottom_value is inactive
+# Heat flux is positive into the soil. heat_top_value is inactive for the
+# selected atmospheric mode. Tss remains a surface diagnostic and
+# is not imposed on the prognostic soil-temperature node.
+heat_top_kind     = "atmospheric"
+heat_bottom_kind  = "free_drainage_internal_energy"
+heat_top_value    = 25
+heat_bottom_value = 15
+
+# --- Dry-air boundary -------------------------------------------------------
+# Top choices:
+#   atmospheric_pressure  Follow atmospheric pressure forcing (field default)
+#   fixed_pressure        Use dry_air_top_value [Pa]
+#   specified_mass_flux   Use dry_air_top_value [g cm-2 s-1]
+# Bottom choices:
+#   hydrostatic_pressure  Apply the depth-dependent hydrostatic pressure (default)
+#   zero_mass_flux        Seal the bottom against dry-air exchange
+#   specified_mass_flux   Use dry_air_bottom_value [g cm-2 s-1]
+# Dry-air mass flux is positive into the soil and is not a pressure-change rate.
+dry_air_top_kind     = "atmospheric_pressure"
+dry_air_bottom_kind  = "hydrostatic_pressure"
+dry_air_top_value    = 101325
+dry_air_bottom_value = 0
+
+# --- Nitrogen boundary (legacy integer adapter) -----------------------------
+# 1=fixed concentration, 2=specified solute flux, 3=natural/outflow boundary.
+# Concentration uses [mol/m3]. The current setup has zero top input and solute
+# transport with bottom drainage. Urea enters through fertilization and
+# hydrolysis, not through a boundary-transport condition.
+nh4_top          = 2
+nh4_bottom       = 3
+nh4_top_value    = 0
+nh4_bottom_value = 0
+no3_top          = 2
+no3_bottom       = 3
+no3_top_value    = 0
+no3_bottom_value = 0
+
+[fertilization]
+# one entry per event; arrays align by index
+events_time   = ["2021-04-05T10:00:00", "2021-04-15T10:00:00", "2021-04-25T10:00:00", "2022-07-01T14:00:00", "2022-09-24T10:00:00", "2023-04-30T10:00:00"]
+events_amount = [50, 50, 50, 70, 80, 36]          # [kgN/ha]
+events_type   = ["ammonium", "nitrate", "urea", "urea", "ammonium", "urea"]
+depth_start   = 5    # [cm] injection layer top
+depth_end     = 10   # [cm] injection layer bottom
+NH4_ratio     = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+NO3_ratio     = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+urea_ratio    = [0.0, 0.0, 1.0, 1.0, 0.0, 1.0]
+# which model state pool each event enters. Optional: when omitted it defaults from
+# events_type (ammonium->nh4_granule, nitrate->no3_liquid, urea->urea).
+#   nh4_granule = solid/granular NH4, slow release via the C_NH4_granule pool
+#   nh4_liquid  = dissolved NH4 input, straight into C_NH4_new
+#   no3_liquid  = nitrate (fast-dissolve, no granule pool) -> C_NO3_new
+#   urea        = urea -> C_Urea_new, later hydrolysis
+pool_entry    = ["nh4_granule", "no3_liquid", "urea", "urea", "nh4_granule", "urea"]
+
+[vegetation]
+PFT_type = "Apple"             # selects PFT defaults from model_library (24 PFTs)
+# --- aerodynamic resistance ---
+method       = "verhoef"       # verhoef | standard | optimal | table
+surface_type = "Grass"         # only used when method = "table"
+crop_code    = 1               # leaf-width lookup for resistances_clm45: 1 = use leaf_width directly (static width); other codes = Tao-LAI inferred width [cfg.Veg.CropCode]
+leaf_width   = 0.05   # [m]   characteristic leaf width -> leaf boundary-layer resistance rbc = 70/LAI*sqrt(w/u)
+Cd           = 0.2    # [-]   leaf drag coefficient -> within-canopy wind attenuation n = Cd*LAI/(2*kappa^2)
+rwc          = 0.0    # [s/m] extra within-canopy aerodynamic resistance (added on top of leaf b.l.); NOT relative water content
+CR           = 0.35   # Verhoef method only: roughness extinction coefficient (sets displacement d and z0m)
+CD1          = 20.6   # Verhoef method only: drag/shelter parameter
+psicor       = 0.2    # Verhoef method only: atmospheric stability (Psi) correction
+cssoil       = 0.01   # Verhoef method only: soil-surface drag coefficient
+# --- leaf inclination distribution (Verhoef LIDF, |LIDFa|+|LIDFb|<=1; feeds RTMo/RTMt lidf) ---
+LIDFa        = -1.0   # erectophile (legacy ScopeParameters value); spherical = -0.35
+LIDFb        = 0.0    # legacy ScopeParameters value; spherical = -0.15
+# --- foliage clumping for canopy radiation only; physical LAI remains unchanged ---
+# Apple PFT prior is 0.80 (Liu et al. 2013, Sect. 3.4.4 and Fig. 10,
+# doi:10.1016/j.scienta.2013.10.009). Changwu uses the landscape-scale value
+# 0.72 from the nearest 1-degree MODIS cell (107.5 E, 35.5 N; ci=0.7193) in
+# data/global/vegetation/clumping_index/He_et_al_2012_1x1.nc.
+clumping_index_source = "manual"  # pft_table | manual; manual is preferred when a site/grid value exists
+clumping_index        = 0.72      # [-] Changwu effective value; 1=random, lower values=more clumped
+# --- canopy layer profiles ---
+canopy_layer_profiles = true   # unified canopy-layer structure/diagnostics switch; maps to legacy options.calc_vert_profiles
+# --- canopy-air profile feedback (ebal_clm45_profile research branch) ---
+canopy_air_profile_eb   = false
+canopy_air_ta_feedback  = true
+canopy_air_ea_feedback  = false
+canopy_air_co2_feedback = false
+# --- LAI and canopy height ---
+vegetation_data_file = "canopy_measurements.csv" # measured canopy inputs; columns use DOY, LAI, hc, Vcmax, Cab, SAI order
+LAI_mode      = "model"        # model | data | constant
+LAI_engine    = "leafc_sla_phen"  # epic_phen_mix | leafc_sla_phen
+hc_mode       = "constant"     # data | constant
+SAI_mode      = "constant"
+LAI_max       = 5.0           # [m2/m2] numerical cap (anti-blowup), NOT physiological
+laimx         = 2.8           # [m2/m2] physiological peak LAI (Apple obs ~2.8)
+LAI_constant  = 3.0           # [m2/m2] LAI when LAI_mode=constant
+canopy_height = 3.1           # [m]     Changwu ~18yr (Wang 2024 Agronomy 14:963)
+SAI_constant  = 0.5           # [m2/m2] deciduous orchard stem area index
+# --- vertical LAI profile shape ---
+LAI_profile_mode  = "uniform"  # uniform | gaussian | beta | exponential
+LAI_profile_peak  = 0.50       # relative height of peak (0=bottom, 1=top)
+LAI_profile_sigma = 0.24       # Gaussian sigma (fraction of canopy height)
+LAI_profile_skew  = 0.8        # beta-profile skewness
+LAI_profile_k     = 1.5        # extinction/shape coefficient
+# --- canopy interception ---
+canopy_storage_per_LAI = 0.1   # [mm/LAI] max canopy water storage per LAI
+interc_F0              = 0.15   # free throughfall fraction (Gash f_ER)
+canopy_water_scheme    = "four_quadrant"  # single | four_quadrant
+# --- plant hydraulics ---
+# hydraulic_scheme:
+#   steady_spac      = v1 steady SPAC only (no organ water storage W)
+#   storage_from_psi = diagnose W from psi via retention (VOD; current default)
+#   storage_dynamic  = prognostic dW/dt path (same wrapper as storage_from_psi today)
+# Legacy aliases still accepted: equilibrium -> steady_spac, dynamic -> storage_from_psi
+hydraulic_scheme    = "storage_from_psi"
+hydraulic_gpmax     = 1.8e-08  # [m/s/MPa] maximum whole-plant xylem conductance (SPAC)
+hydraulic_p50       = -2.5     # [MPa] 50% conductivity loss
+hydraulic_aa        = 3.2      # Manzoni vulnerability shape
+hydraulic_psil_min  = -6       # [MPa] min leaf water potential
+hydraulic_init_psir     = -0.10  # [MPa] initial root water potential
+hydraulic_init_pstem    = -0.11  # [MPa] initial stem water potential
+hydraulic_init_psil_sun = -0.12  # [MPa] initial sunlit-leaf water potential
+hydraulic_init_psil_sha = -0.12  # [MPa] initial shaded-leaf water potential
+# --- organ storage (active when storage_from_psi or storage_dynamic) ---
+# current default: calSPAC psi + linear PV curve -> W (VWC for VOD).
+
+# PV curve per organ:  water_stored = water_capacity * (retention_slope * psi + 1)
+#   at psi=0 -> water_stored = capacity (full);  at psi = -1/slope -> water_stored = 0 (empty).
+retention_slope_root = 3.3e-3   # [1/m] PV-curve slope, root  (larger = psi swings less per unit water change)
+retention_slope_stem = 3.3e-3   # [1/m] PV-curve slope, stem
+retention_slope_leaf = 3.3e-3   # [1/m] PV-curve slope, leaf
+water_capacity_root  = 0.0006   # [m]   root water storage capacity (0.6 mm, fine-root tissue water)
+water_capacity_stem  = 0.0008   # [m]   stem water storage capacity (0.8 mm sapwood, dominant capacitor)
+water_capacity_leaf  = 0.0001   # [m]   leaf water storage capacity (0.1 mm leaf column at LAI=3)
+path_root_to_stem    = 0.5       # [m]   root->stem water path length (sets gravity correction)
+path_stem_to_leaf    = 0.5       # [m]   stem->leaf water path length (sets gravity correction)
+stem_capacitance_lag = 0         # [s]   stem storage lag time constant (0 = instantaneous; >0 = AM/PM VOD swing on stem only)
+# --- tree structure for gpmax fallback ---
+tree_DBH   = 21.3   # [cm]          diameter at breast height; only used to estimate gpmax when hydraulic_gpmax <= 0
+tree_CAH   = 10.2   # [m2]          crown area per tree; only used to estimate gpmax when hydraulic_gpmax <= 0
+tree_Ksmax = 5      # [kg/m/s/MPa]  max stem hydraulic conductance; only used to estimate gpmax when hydraulic_gpmax <= 0
+# --- root system ---
+root_dist_mode = 1              # 0=Jackson, 1=measured root.csv
+root_measured_file = "root.csv" # measured root-length-density file when root_dist_mode=1
+root_type      = 12             # Jackson beta-profile type; used only when root_dist_mode=0
+root_max_depth = 1000   # [cm]   rooting-depth cutoff; D95=884 cm measured, rounded to 10 m
+root_rroot_mm  = 0.5    # [mm]   mean root radius
+gsr_formula    = "radial_darcy_series"  # soil-root conductance: katul | clm5 | radial_darcy_series
+# root-soil hydraulic resistance
+root_hydraulic_krmax     = 0                    # [m/s] CLM5 root tissue krmax; 0 disables CLM5-krmax branch
+root_side_mode           = "stemmus_scope_rrr"  # none | clm5_krmax | stemmus_scope_rrr
+root_radial_impedance_Pr = 4e11                 # [s/m] STEMMUS-SCOPE radial impedance
+root_contact_enabled     = false                # enable root-soil contact resistance
+root_contact_psi_start   = -0.05                # [MPa] soil psi where contact resistance begins
+root_contact_psi_end     = -1.5                 # [MPa] soil psi at full contact resistance
+# root nitrogen uptake solver (DAISY single-root + Nacry membrane M-M)
+root_solver_tol      = 1e-6   # [mg/L] bisection convergence tolerance
+root_solver_max_iter = 50     # bisection max iterations
+# --- phenology (GDD model, GA+fmincon calibrated, RMSE=0.348) ---
+T_BASE     = 5.59    # [degC]
+T_OPT      = 18.14   # [degC]
+PHU        = 3921    # [degC*day]
+GMHU       = 71.6    # [degC*day]
+sowing_day = 79      # [DOY] budburst ~3/20
+FRGW1      = 0.024
+LAIMX1     = 0.311
+FRGW2      = 0.886
+LAIMX2     = 0.867
+DLAI       = 0.592
+ALAI_MIN   = 0.293
+beta_decay = 4.78
+yr_cur     = 11      # current year in rotation (soil-N init)
+yr_full    = 10      # full rotation length (years)
+# --- plant C/N coupling (C-dominant FlexibleCN; species Vmax/Km/CN in PFT table) ---
+cn_coupling_mode     = "flexible_cn"  # CLM5 FlexibleCN (C-dominant)
+cn_flex_offset       = 10.0    # [gC/gN] C:N elasticity half-width (organ C:N clamp [CN_target, CN_target+offset])
+# --- photosynthesis ---
+photo_type        = "C3"       # C3 | C4
+vcmax_source      = "manual"   # "pft_table" | "manual"  (Vcmax25 base source; LUNA overrides daily when luna=true)
+vcmax_manual      = 105        # [umol/m2/s] (overridden by LUNA when luna=true)
+luna              = true       # LUNA N->Vcmax feedback (needs switches.nitrogen)
+cab_from_luna     = true       # drive leaf Cab from LUNA dynamic N
+photo_Rd_C3       = 0.015      # Rd25/Vcmax25 ratio (C3)
+photo_Rd_C4       = 0.025      # Rd25/Vcmax25 ratio (C4)
+leaf_resp_method  = "vcmax_proportional"  # "vcmax_proportional" | "atkin2015"
+# --- stomatal conductance (Medlyn + optional heat term) ---
+# Medlyn gs [mol/m2/s] and slope
+gs_g0        = 0.0001  # [mol/m2/s] minimum (residual) conductance
+gs_g1        = 8.2     # [kPa^0.5]  Medlyn slope (CLM5-FruitTree, Dabbaghi 2022)
+gs_iter_init = 0.4     # initial gs guess
+# Optional heat-induced additive gs (KEEP OFF until calibrated)
+# docs/plant/stomata_heat_induced_gs_design.md
+heat_gs_enable   = false   # master switch; false => g_heat≡0, pure Medlyn
+# gs magnitudes [mol/m2/s]  (only used when heat_gs_enable=true)
+heat_gs_max      = 0.08    # [mol/m2/s] g_heat full amplitude when all gates open
+heat_gs_cap      = 0.6     # [mol/m2/s] total gs cap (gs0 + g_heat)
+# linear gate ramps: 0→1 between (lo, hi); g_heat = max * φ_T * φ_w * φ_D * φ_A
+heat_gs_T_on_C   = 32.0    # [degC]   φ_T starts
+heat_gs_T_full_C = 38.0    # [degC]   φ_T full
+heat_gs_wt_off   = 0.4     # [-]      φ_w starts (sfactor); below → g_heat=0
+heat_gs_wt_on    = 0.8     # [-]      φ_w full
+heat_gs_D_lo_kPa = 1.5     # [kPa]    φ_D starts closing
+heat_gs_D_hi_kPa = 3.5     # [kPa]    φ_D = 0 at/above
+heat_gs_A_lo     = 1.0     # [umol/m2/s] φ_A starts
+heat_gs_A_hi     = 5.0     # [umol/m2/s] φ_A full
+
+# =============================================================================
+#  SCOPE radiative-transfer settings  (was input_data.xlsx 'options' sheet)
+#  Fully merged here; no separate SCOPE Excel. File references (spectral/soil/
+#  atmosphere) now resolve to data/model_library_nc/, not per-site.
+# =============================================================================
+[scope]
+simulation             = 1     # 0=lookup table, 1=time series, 2=LUT-by-index
+calc_ebal              = true  # solve canopy energy balance
+calc_fluor             = true  # compute fluorescence (SIF)
+calc_PSI               = false # separate PSI/PSII (false = combined fluspect)
+calc_directional       = false # directional (BRDF) reflectance
+calc_planck            = false # Planck (spectral thermal) emission
+calc_xanthophyll_abs   = false # xanthophyll absorption
+calc_rss_rbs           = true # soil resistance rss/rbs
+fluorescence_model     = 0     # 0 = empirical, 1 = mechanistic
+apply_T_corr           = true  # temperature correction of fluspect
+soilspectrum           = 0     # 0 = file (model_library), 1 = BSM model
+rt_thermal             = 0     # 0 = fixed leaf/soil emissivity, 1 = from optical tail
+cca_function_of_cab    = true # tie carotenoid to chlorophyll
+soil_heat_method       = 1     # production: dynamic force-restore from bare-skin temperature history; 2 retains the 0.30*Rn_bare alternative
+
+# =============================================================================
+#  SCOPE leaf & soil optics  (was input_data.xlsx 'inputdata' sheet)
+#  !! values below are SCOPE TEMPLATE DEFAULTS carried over from the Yangling
+#     example input_data.xlsx; NOT yet Changwu-calibrated. TODO: calibrate.
+# =============================================================================
+[model_library]                # shared SCOPE reference data (data/model_library_nc/, same for all sites)
+format             = "netcdf"   # long-term authoritative library format (only netcdf supported)
+leaf_optics_file   = "leaf_optics/Optipar2017_ProspectD.nc"  # PROSPECT-D leaf optical constants (nr, Kab, Kca, Kw, ...)
+atmosphere_file    = "atmosphere/FLEX-S3_std.nc"              # MODTRAN atmospheric transmittance/radiance
+soil_spectrum_file = "soil_spectrum/soilnew.nc"               # soil reflectance library (used when scope.soilspectrum=0)
+leaf_angles_file   = ""                                       # OPTIONAL measured leaf inclination distribution (.nc, 13 bins). Empty => use [vegetation] LIDFa/LIDFb. e.g. "leaf_angles/soybean_wildtype_leafangles.nc"
+# BRDF observer angles (scope.calc_directional=true). NetCDF var "data" = N x 2 [tto_deg, psi_deg].
+directional_angles_file = "directional/brdf_angles2.nc"
+
+[leaf_optical]                 # PROSPECT-PRO leaf biochemistry -> RTMo / fluspect
+Cab              = 100     # [ug/cm2]  chlorophyll a+b
+Cca              = 25      # [ug/cm2]  carotenoids (tied to Cab when scope.cca_function_of_cab=true)
+Cdm              = 0.012   # [g/cm2]   leaf dry matter
+Cw               = 0.009   # [cm]      leaf water equivalent thickness
+Cs               = 0       # [-]       senescent (brown pigment) fraction
+Cant             = 0       # [ug/cm2]  anthocyanins
+N_mesophyll      = 1.4     # [-]       PROSPECT mesophyll structure parameter
+leaf_rho_thermal = 0.01    # [-]       leaf reflectance, thermal band
+leaf_tau_thermal = 0.01    # [-]       leaf transmittance, thermal band
+fqe              = 0.01    # [-]       fluorescence quantum efficiency (SIF; scope.calc_fluor)
+V2Z              = 0       # [0..1]    xanthophyll de-epoxidation state (Viola->Zea)
+# fluorescence NPQ tuning (scope.calc_fluor)
+fluor_beta         = 0.4   # [-] PSII fraction of absorbed light
+fluor_kNPQs        = 0     # [-] sustained-NPQ rate constant
+fluor_qLs          = 1     # [-] fraction of functional PSII reaction centres
+fluor_stressfactor = 1     # [-] stress scaling on NPQ
+
+[soil_optical]                 # soil reflectance + evaporation resistances -> RTMo / ebal
+soil_spectrum_index = 1     # column in model_library.soil_spectrum_file (scope.soilspectrum=0)
+rss                 = 500   # [s/m]  soil surface resistance to evaporation (scope.calc_rss_rbs)
+rbs                 = 10    # [s/m]  soil aerodynamic boundary-layer resistance
+rs_thermal          = 0.06  # [-]    soil reflectance, thermal band
+# BSM spectral soil model (used only when scope.soilspectrum=1)
+BSM_brightness = 0.5      # [-]    soil brightness
+BSM_lat        = 25       # [deg]  BSM spectral-shape parameter (NOT the site latitude; SCOPE2 default)
+BSM_lon        = 45       # [deg]  BSM spectral-shape parameter (NOT the site longitude; SCOPE2 default)
+
+[geometry]                     # observation geometry; solar zenith tts auto-computed from lat/lon/time
+observer_zenith  = 0      # [deg] tto: viewing zenith angle (0 = nadir)
+relative_azimuth = 90     # [deg] psi: sun-viewing relative azimuth
+
+[numerics]
+# --- iteration limits ---
+NIT                 = 100       # max Picard iterations per soil substep
+max_iter_eb         = 200       # max canopy energy-balance iterations
+# --- convergence tolerances ---
+tol_theta           = 1e-4      # [-] maximum unsaturated endpoint increment
+tol_head_saturated_cm = 0.1     # [cm] maximum saturated-node head increment
+tol_water_mass_mm   = 1e-4      # [mm/step] long-run actual QMT/QMB/Srt mass residual
+tol_surface_water_cm = 1e-5     # [cm/step] surface-reservoir mass and complementarity acceptance
+tol_energy          = 0.1       # [degC-equivalent] max raw |dU|/(dU/dT) Picard-map defect
+tol_energy_balance_J_cm2 = 1e-2 # [J/cm2/step] exact soil-column internal-energy residual
+tol_air_relative    = 1e-3      # [-] maximum dry-air pressure increment relative to current pressure
+tol_air_mass_g_cm2  = 1e-8      # [g/cm2/step] exact dry-air column mass residual
+tol_air_mass_relative = 1e-4    # [-] dry-air column residual divided by accepted column inventory
+tol_eb              = 5         # [W/m2] canopy energy-balance closure tolerance
+# --- frozen surface / soil-interface scalar closure ---
+soil_interface_closure_enable = false      # legacy Dirichlet T* path only; atmospheric G closure is always active
+soil_interface_closure_tol_W_m2 = 0.01     # [W/m2] production target; the 5 W/m2 physics-book criterion remains a hard upper bound, not an annual closure target
+soil_interface_closure_max_iters = 6       # [-] maximum soil-only flux corrections after the analytic predictor
+soil_interface_closure_substep_retry_enable = true       # refine soil tiles before relaxing interface closure
+soil_interface_closure_substep_retry_factor = 0.5        # [-] geometric tile reduction across freeze/thaw jumps
+soil_interface_closure_substep_retry_max_levels = 3      # [-] bounded temporal-refinement ladder
+soil_interface_closure_bounded_acceptance_enable = true  # accept only a finite, fully converged best trial as last resort
+soil_interface_closure_bounded_tol_W_m2 = 15.0           # [W/m2] hard cap; strict 5 W/m2 flag remains unchanged
+soil_interface_closure_bounded_relative_tol = 0.20       # [-] fallback must also be <=20% of interface-flux magnitude
+# --- numerical kernels ---
+hydraulic_kernel    = "array"   # "array" (vectorized) | "scalar" (reference, for A/B verification)
+matric_kernel       = "array"   # "array" (vectorized) | "scalar" (reference)
+# --- discretization and stabilization ---
+extrapolate         = false     # temporal extrapolation for initial guess
+upwind              = true      # upwind scheme for convective terms
+saturation_enforce  = true      # saturation detection and enforcement
+artificial_disp     = false     # artificial dispersion (N-transport stabilization)
+# --- restart and accepted-state diagnostic cadence ---
+checkpoint_interval = 168       # [steps] resume-checkpoint cadence (7 days for hourly forcing)
+diagnostic_interval = 0         # [steps] accepted-state print

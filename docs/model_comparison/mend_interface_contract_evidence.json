@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-15",
+  "scope": "Evidence snapshot for confirmed interface contract; not a release or final combined regression certificate.",
+  "contract": "docs\\soil\\biogeochemistry\\MEND_SOURCE_PRODUCTION_CONTRACT.md",
+  "sha256": {
+    "src/+soil/+microbe/mendSourceHour.m": "049c1949279301706674ac4df1ad0129d96eec68b5143a1e54011e43e1064af6",
+    "src/+soil/+microbe/advanceSourceCandidate.m": "f5c9edbb223545a6513581df319faafae866e79c6d8771167b2f4a1e6adec07f",
+    "src/+soil/+microbe/mendEnvironmentalParameters.m": "8cdf643f8938d7d2ae6ccc419648edf6d0b119ad998f69ab4ec7344ec73da731",
+    "src/+soil/+nitrogen/advanceAcceptedCandidate.m": "c1a4703fc1be32f2af23e7307e168b4545ca3715de35043ebc44fec7b3ba3d63",
+    "src/+soil/+dom/transportConservative.m": "cb33eed65b8966f1f0cbd5b9b121dc7cd19003a5da4ef9e876e5153cc1322603",
+    "src/+soil/+dom/advanceAcceptedCandidate.m": "4fa1f0e6944462294530734ed49e5ed6fd8b064f753cfe2eae57af443d070180",
+    "src/+soil/+microbe/bioparticleTransport.m": "9af7a6ce803d0f73be2bc07b818fcd597a75b88b4d3af027e4105ec0abbb7b8f",
+    "src/+soil/commitCandidate.m": "634f6812f10ae4d9e71bbf0925b8267859863daee97eb55fd637d14ab6205501",
+    "src/+init/buildMendHourlyState.m": "62bc60e4c3694a89f9a1e09c8ee81fc6c5e94f1d3fee53c451a86a88d8ea9338",
+    "data/sites/changwu/site.toml": "791ebcf5ad2ed41ef56850c885e8f0d651138a7241d01350406cf0e3627b3fb7"
+  }
+}

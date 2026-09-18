@@ -1,0 +1,56 @@
+function result = buildResult(request, airFlux, accepted, applied)
+%BUILDRESULT  Package actual dry-air boundary fluxes with inward-positive sign.
+%
+%   Editor: Jizixing Zhu; Date: 2026-07-15.
+%   Change: 2026-07-16 Jizixing Zhu -- distinguish requested gas policy,
+%           applied mathematical BC, and solved dry-air reaction flux.
+
+    if nargin < 4 || isempty(applied) ...
+            || (isstruct(applied) && isempty(fieldnames(applied)))
+        applied = inferApplied(request);
+    end
+
+    assert(isstruct(airFlux) && all(isfield(airFlux, {'QAT','QAB'})), ...
+        'buildDryAirBoundaryResult:badFlux', 'airFlux needs QAT and QAB.');
+    result = struct('schema_version', 1, ...
+        'sign_convention', 'flux_into_domain_positive', ...
+        'accepted', logical(accepted), ...
+        'top', endpoint(request.top, applied.top_kind, -double(airFlux.QAT)), ...
+        'bottom', endpoint(request.bottom, applied.bottom_kind, double(airFlux.QAB)));
+end
+
+function out = endpoint(request, appliedKind, actual)
+%ENDPOINT  Pair one requested dry-air boundary with its solved mass flux.
+% Editor: Jizixing Zhu; Date: 2026-07-15.
+% Change: 2026-07-16 Jizixing Zhu -- include the applied boundary kind.
+% Change: 2026-07-16 Jizixing Zhu -- retain pressure provenance,
+%         hydrostatic status, and dry-air mass-flux semantics.
+    out = struct('requested_kind', request.kind, ...
+        'applied_kind', appliedKind, ...
+        'requested_value_source', request.value_source, ...
+        'hydrostatic_enabled', logical(request.hydrostatic_enabled), ...
+        'requested_flux_quantity', request.flux_quantity, ...
+        'requested_pressure_Pa', request.pressure_Pa, ...
+        'requested_flux_into_domain_g_cm2_s', ...
+            request.requested_flux_into_domain_g_cm2_s, ...
+        'actual_flux_into_domain_g_cm2_s', actual);
+end
+
+function applied = inferApplied(request)
+% Infer the deterministic applied kind for direct compatibility callers.
+% Editor: Jizixing Zhu; Date: 2026-07-16.
+    applied = struct( ...
+        'top_kind', requestKindToApplied(request.top.kind), ...
+        'bottom_kind', requestKindToApplied(request.bottom.kind));
+end
+
+function kind = requestKindToApplied(requestKind)
+% Translate a gas policy to its pressure/mass-flux boundary-row type.
+% Editor: Jizixing Zhu; Date: 2026-07-16.
+    if ismember(requestKind, { ...
+            'fixed_pressure','atmospheric_pressure','hydrostatic_pressure'})
+        kind = 'fixed_pressure';
+    else
+        kind = 'fixed_mass_flux';
+    end
+end

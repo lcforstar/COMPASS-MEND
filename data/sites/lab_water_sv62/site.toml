@@ -1,0 +1,81 @@
+# Huang et al. (2011) SV62 layered-soil infiltration benchmark.
+# This laboratory site contains only the Richards inputs used by the benchmark.
+
+[simulation]
+spatial_mode = "point"
+point_context = "laboratory"
+
+[site]
+name = "lab_water_sv62"
+description = "SV62 layered coarse-soil ponded infiltration benchmark"
+latitude = 56.726
+longitude = -111.379
+elevation = 0.0
+
+[time]
+start = "2021-01-01T00:00:00"
+end = "2021-01-01T01:00:00"
+dt = 30                         # [s] Matches the ClimaLand tutorial step.
+dt_max = 30
+dt_min = 0.1171875              # [s] Allows eight binary retry reductions.
+clock_basis = "utc"
+utc_offset = 0
+
+[grid]
+tot_depth = 110                 # [cm] ClimaLand domain is z = -1.1 to 0 m.
+NL = 50                         # [-] 2.2 cm uniform elements.
+uniform_grid = true
+max_elements = 1000
+NS = 16                         # [-] Sixteen measured hydraulic horizons.
+nS = 2
+nD = 2
+
+[soil_input]
+# ClimaLand layered_soil.jl treats soil depths as sampled coordinates and maps
+# them to element centers. Endpoint values are held outside the sampled range.
+# Set "horizon_bounds" instead to recover the legacy piecewise-constant tiling.
+vertical_parameter_mode = "sample_linear"
+
+[switches]
+solve_soil_heat = false
+solve_soil_air = false
+solve_nitrogen = false
+plant_cn_cycle = false
+soil_freezing = false
+root_water_uptake = false
+root_nitrogen_uptake = false
+water_retention_model = "van_genuchten"
+soil_freezing_curve = false
+temperature_affects_retention = false
+wetting_heat_method = "prunty"
+thermal_conductivity_model = "de_vries"
+effective_thermal_properties = false
+temperature_driven_liquid_flow = false
+pressure_driven_vapor_diffusion = false
+pressure_driven_liquid_flow = false
+dual_porosity = false
+track_total_nitrogen = false
+biological_n_fixation = false
+nitrogen_input_phase = "dissolved"
+bulk_density_source = "soil"
+
+[numerics]
+NIT = 80
+tol_theta = 1e-4                # [-] Maximum unsaturated endpoint increment.
+tol_head_saturated_cm = 0.1     # [cm] Maximum saturated-node head increment.
+tol_water_mass_mm = 1e-6        # [mm/step] Actual-flux mass residual.
+hydraulic_kernel = "scalar"
+matric_kernel = "scalar"
+substep_enabled = true
+substep_grow_factor = 2.0
+substep_shrink_factor = 0.5
+substep_successes_before_grow = 4
+substep_hold_after_reject = 6
+
+[boundary]
+# The public head unit is cm. The 5 cm ponded top head and free-drainage bottom
+# match the current ClimaLand SV62 tutorial. bottom_value remains present only
+# because all boundary CSV files have one stable three-column schema.
+water_top_kind = "constant_head"
+water_bottom_kind = "free_drainage"
+water_boundary_file = "water_boundary.csv"

@@ -1,0 +1,33 @@
+function result=allocateCommonInventory(stock,release,request)
+%ALLOCATECOMMONINVENTORY Ration same-species requests against one inventory.
+%   stock/release are [NL x 2] NH4/NO3 amounts [mg N g^-1 dry soil].
+%   request is [NL x 2 x nProcess] nonnegative integrated demand. Each
+%   species is allocated independently; if demand exceeds stock+release, all
+%   requests of that species share the same proportional factor. The
+%   function is pure and returns requested, actual, unmet, remaining and
+%   net exchange fields without modifying caller state.
+%   This is a COMPASS coupling assumption, not an original MEND equation.
+%   Editor: Jizixing Zhu; Date: 2026-09-12.
+    assert(ismatrix(stock)&&isequal(size(stock),size(release)) ...
+        &&size(stock,2)==2&&ndims(request)==3 ...
+        &&isequal(size(request,1),size(stock,1))&&size(request,2)==2, ...
+        'soil:nitrogen:allocationShape','DIN allocation shapes must be NL-by-2 and NL-by-2-by-process.');
+    assert(all(isfinite([stock(:);release(:);request(:)])) ...
+        &&all([stock(:);release(:);request(:)]>=0), ...
+        'soil:nitrogen:allocationValues','DIN allocation inputs must be finite and nonnegative.');
+    available=stock+release;
+    demand=sum(request,3);
+    factor=ones(size(available));
+    limited=demand>available;
+    factor(limited)=available(limited)./demand(limited);
+    actual=request.*reshape(factor,size(factor,1),size(factor,2),1);
+    used=sum(actual,3);
+    remaining=available-used;
+    assert(all(remaining(:)>=-1e-14), ...
+        'soil:nitrogen:allocationClosure','Common DIN allocation exceeded inventory.');
+    result=struct('requested',request,'actual',actual, ...
+        'unmet',request-actual,'scale',factor,'remaining',remaining, ...
+        'gross_release',release,'net_exchange',release-used, ...
+        'residual',remaining-stock-release+used, ...
+        'policy','COMPASS_same_stage_common_inventory_proportional');
+end

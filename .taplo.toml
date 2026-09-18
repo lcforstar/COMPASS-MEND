@@ -1,0 +1,9 @@
+# Central TOML schema association for every COMPASS site configuration.
+# Keeping this rule at the workspace root avoids per-document schema caching.
+
+[[rule]]
+include = ["data/sites/**/site.toml"]
+
+[rule.schema]
+path = "data/sites/changwu/site-config-schema.json"
+enabled = true

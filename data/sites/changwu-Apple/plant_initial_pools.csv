@@ -1,0 +1,12 @@
+﻿# Plant C/N pool initial state used to construct prognostic Y0.,,
+# These are site-specific start states, not species-typical PFT parameters.,,
+# Carbon-primary: six C pools and N_storage are prescribed; other N pools use N = C / CN_target.,,
+# Spin-up workflow: run one year, replace these values with year-end pools, and repeat to equilibrium.,,
+pool,value,unit
+C_labile,40.966741,gC/m2
+C_leaf,0,gC/m2
+C_root_fine,150.48736,gC/m2
+C_stem_wood,1121.256,gC/m2
+C_fruit,0,gC/m2
+N_storage,6.7,gN/m2
+C_storage,135,gC/m2
