@@ -75,7 +75,8 @@ if use_crop_alloc
     f_root  = phen_alloc.crop_a_root;
     f_stem  = phen_alloc.crop_a_stem;
     f_fruit = phen_alloc.crop_a_repr;
-    if ~phen_alloc.crop_live
+    if ~phen_alloc.crop_live || (isfield(phen_alloc,'crop_mature_flag') ...
+            && phen_alloc.crop_mature_flag)
         f_leaf = 0; f_root = 0; f_stem = 0; f_fruit = 0;
     end
     fruit_active = f_fruit > 0;
@@ -214,3 +215,11 @@ diag.G_pot_fruit  = G_pot_fruit;
 diag.fruit_active = double(fruit_active);
 
 end
+
+% Change: 2026-09-30 Wenjie Liu -- annual WSC allocation is nitrogen-free;
+% physiological maturity stops structural and grain growth N demand.
+%   Phase C M2-B.1b (2026-05-19): new module. ClimaLand alignment — pure function,
+%   no state mutation, called per KT in main loop AFTER computeNPP.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

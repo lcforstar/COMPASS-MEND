@@ -1,4 +1,6 @@
 function [model, candidates] = stageCanopyInputs(model, kt, dt_outer_s)
+% Change: 2026-09-30 Wenjie Liu -- selectively restore COMPASS canopy
+% behavior; retain winter-wheat phenology and CoLM C/N allocation.
 %STAGECANOPYINPUTS  Finalize LAI, growth temperature, and leaf optics.
 %
 %   Inputs:
@@ -18,18 +20,25 @@ function [model, candidates] = stageCanopyInputs(model, kt, dt_outer_s)
 %   Editor: Jizixing Zhu; Date: 2026-07-16.
 %   Change: 2026-07-17 Jizixing Zhu -- document ownership of the bare-surface
 %     template and the accepted-snow seed used by same-step snow prediction.
+% Change: 2026-09-29 Wenjie Liu -- optional BGC replay context supplies the
+% accepted preceding-cycle air-temperature tail; ordinary runs unchanged.
+% Change: 2026-09-30 Wenjie Liu -- freeze daily/crop events before canopy
+% exchange and expose that candidate to all same-step downstream consumers.
     model.built.workspace.scope_step = init.prepareScopeStep(model, kt);
+    phenology_next = vegetation.integrated.phenology.stageCandidate(model,kt,dt_outer_s);
+    model.built.workspace.scope_step.phenology_candidate = phenology_next;
     lai_state_next = advanceHeatAccumulationLai( ...
         model, kt, dt_outer_s);
     model = applyCanopyLAI(model, kt, lai_state_next);
     [model, air_temperature] = applyGrowthTemperature(model, kt);
     model = applyDynamicCabLeafOptics(model);
     candidates = struct( ...
+        'phenology', phenology_next, ...
         'lai_state', lai_state_next, ...
         'leaf_resp_Ta', air_temperature);
 end
 
-function lai_state_next = advanceHeatAccumulationLai(model, kt, dt_outer_s)
+function lai_state_next = advanceHeatAccumulationLai(model, kt, ~)
 % Advance the EPIC heat-unit LAI candidate at the first step of a new day.
     lai_state_next = model.built.Y.vegetation.lai_state;
     built = model.built;
@@ -37,17 +46,25 @@ function lai_state_next = advanceHeatAccumulationLai(model, kt, dt_outer_s)
     if ~strcmpi(readField(canopy_config, 'LAI_mode', 'constant'), 'model')
         return;
     end
+    engine = char(string(readField(canopy_config,'LAI_engine','epic_phen_mix')));
+    if strcmpi(engine,'leafc_sla_phen') && readField(built.control.switches,'lPlantCN',0)==1 ...
+            && readField(built.control.switches,'lNefc',0)==1
+        return; % leaf-C engine does not advance a second empirical LAI state.
+    end
     time_control = built.control.time;
     steps_per_day = max(1, round(86400 / time_control.Delt_t));
-    if kt <= 1 || mod(kt - 1, steps_per_day) ~= 0
-        return;
-    end
-    timestamp = time_control.start_time + seconds( ...
-        step.readAcceptedTime(model.runtime) + dt_outer_s);
-    day_index = (year(timestamp) - year(time_control.start_time)) * 365 ...
-        + day(timestamp, 'dayofyear');
+    timestamp = time_control.start_time + seconds(step.readAcceptedTime(model.runtime));
     phenology = built.parameters.veg.phenology;
     driver_state = built.vegetation_state.phen_driver;
+    forcing_start = readField(driver_state,'forcing_start_time',time_control.start_time);
+    day_index = floor(days(dateshift(timestamp,'start','day') ...
+        - dateshift(forcing_start,'start','day'))) + 1;
+    is_crop = vegetation.getPFTValue(built.parameters.veg.structure.PFT_type,'crop_phenology',0)==1;
+    if is_crop
+        if readField(lai_state_next,'last_advance_day_index',0)==day_index,return;end
+    elseif kt<=1 || mod(kt-1,steps_per_day)~=0
+        return;
+    end
     parameters = struct( ...
         'DLAI', readField(phenology, 'DLAI', 0), ...
         'yr_cur', readField(phenology, 'yr_cur', 1), ...
@@ -57,8 +74,14 @@ function lai_state_next = advanceHeatAccumulationLai(model, kt, dt_outer_s)
         'T_OPT', readField(phenology, 'T_OPT', 24), ...
         'ALAI_MIN', readField(phenology, 'ALAI_MIN', 0.1), ...
         'GMHU', readField(phenology, 'GMHU', 0), ...
-        'is_deciduous', ~vegetation.getPFTValue( ...
+        'is_deciduous', ~is_crop && ~vegetation.getPFTValue( ...
             built.parameters.veg.structure.PFT_type, 'evergreen'), ...
+        'is_crop', is_crop, ...
+        'calendar_doy', day(timestamp,'dayofyear'), ...
+        'calendar_year', year(timestamp), ...
+        'crop_planting_event', model.built.workspace.scope_step.phenology_candidate.state.crop_planting_event, ...
+        'crop_live', model.built.workspace.scope_step.phenology_candidate.state.crop_live, ...
+        'crop_phase', model.built.workspace.scope_step.phenology_candidate.state.crop_phase, ...
         'sowing_day', readField(phenology, 'sowing_day', 1), ...
         'beta_decay', readField(phenology, 'beta_decay', 1));
     driver = struct( ...
@@ -74,6 +97,7 @@ function lai_state_next = advanceHeatAccumulationLai(model, kt, dt_outer_s)
         lai_state_next, day_index, previous_stress, max_temperature, ...
         min_temperature, parameters, driver);
     lai_state_next.wt_day_min = 1.0;
+    if is_crop,lai_state_next.last_advance_day_index=day_index;end
 end
 
 function model = applyCanopyLAI(model, kt, lai_state)
@@ -127,6 +151,14 @@ function model = applyCanopyLAI(model, kt, lai_state)
             canopy.LAI = readSeries(lai_state, 'LAI', kt, canopy.LAI);
     end
 
+    if strcmpi(readField(canopy_config,'LAI_mode','constant'),'model') ...
+            && vegetation.getPFTValue(vegParameters.structure.PFT_type,'winter_wheat_cn',0)==1
+        ps = built.workspace.scope_step.phenology_candidate.state;
+        if ~ps.crop_live || ps.crop_phase<2
+            canopy.LAI = 0; % explicit pre-emergence/harvest green-canopy state.
+        end
+    end
+    canopy.green_LAI = canopy.LAI; % this bundle's LAI is photosynthetic green area.
     if isfield(canopy, 'layer_weight') && ~isempty(canopy.layer_weight)
         canopy.LAI_layer = canopy.layer_weight * canopy.LAI;
     end
@@ -166,6 +198,12 @@ function [model, air_temperature] = applyGrowthTemperature(model, kt)
     end
     first_index = max(1, kt - window + 1);
     values = [history(first_index:kt - 1); air_temperature];
+    if kt<window&&isfield(model.runtime,'biogeochemistry_cycle') ...
+            &&model.runtime.biogeochemistry_cycle.active
+        tail=model.runtime.biogeochemistry_cycle.previous_air_temperature_tail_C(:);
+        need=window-kt;
+        values=[tail(max(1,numel(tail)-need+1):end);values];
+    end
     model.built.workspace.scope_step.canopy.Tgrowth = ...
         mean(values, 'omitnan');
 end

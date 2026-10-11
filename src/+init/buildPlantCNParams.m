@@ -30,6 +30,8 @@ function pcn = buildPlantCNParams(raw, built)
 % Editor: Jizixing Zhu; Date: 2026-06-27.
 % Change: 2026-06-28 Jizixing Zhu — f_alloc_* initialized by PFT class: allometry PFTs
 %   without a storage pool (grass) carry the dead NaN sentinel; crops stay required.
+% Change: 2026-09-30 Wenjie Liu -- compile one resolved parameter view and
+% explicit provenance for demand, allocation, turnover and leaf physiology.
 
     v   = raw.config.vegetation;
     PFT = built.parameters.veg.structure.PFT_type;
@@ -94,6 +96,26 @@ function pcn = buildPlantCNParams(raw, built)
     pcn.storage.fstor2tran       = requiredPftValue(v, PFT, 'fstor2tran');
     pcn.storage.f_storage_root   = optionalPftValue(v, PFT, 'f_storage_root', 0.55);
     pcn.storage.storage_cushion  = compatPftValue(v, PFT, 'storage_cushion', 1.2);
+
+    [pcn.resolved, pcn.parameter_sources] = init.compilePlantParameters(v, PFT);
+    % These compatibility constants are now explicit compiled values too.
+    pcn.resolved.fcur = pcn.allocation.fcur;
+    pcn.resolved.storage_cushion = pcn.storage.storage_cushion;
+    pcn.resolved.cn_flex_offset = pcn.coupling.cn_flex_offset;
+    pcn.resolved.laimx = built.parameters.veg.canopy.laimx;
+    % Initial and subsequent plant pools use the same active split values.
+    % These layered values were already resolved with site > PFT priority.
+    pcn.resolved.croot_stem=pcn.allocation.croot_stem;
+    pcn.resolved.f_storage_root=pcn.storage.f_storage_root;
+    if strcmp(pcn.parameter_sources.f_storage_root,'explicit_legacy_compatibility')
+        pcn.parameter_sources.f_storage_root='explicit_legacy_initialization';
+    end
+    if isfield(v,'laimx')&&~isempty(v.laimx)
+        pcn.parameter_sources.laimx='site.toml:vegetation';
+    else
+        pcn.parameter_sources.laimx='buildVeg:explicit_default';
+    end
+
 end
 
 % ---------------------------------------------------------------------------
@@ -193,3 +215,7 @@ function validateScalarFinite(val, PFT, name)
             'PFT "%s" parameter "%s" must be a finite scalar numeric value.', char(PFT), name);
     end
 end
+
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

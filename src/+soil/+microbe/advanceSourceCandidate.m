@@ -143,6 +143,15 @@ function [candidate,organic,dom,mend,feedback]=advanceSourceCandidate( ...
         'MBA_to_DOM','MBA_to_POM1','MBA_to_POM2','MBA_to_ENZP1','MBA_to_ENZP2','MBA_to_ENZM', ...
         'ENZP1_to_DOM','ENZP2_to_DOM','ENZM_to_DOM','MBA_to_MBD','MBD_to_MBA'};
     flux=struct();for j=1:numel(targetFlux),flux.(targetFlux{j})=f.(sourceFlux{j});end
+    % Preserve every accepted source-hour carbon route needed to diagnose
+    % dissolved-carbon partitioning, intracellular enzyme turnover, and the
+    % complete microbial respiration budget.
+    % Change: 2026-09-18 Wenjie Liu -- expose complete MEND C flux ledger.
+    flux.DOM_to_QOM=f.DOM2QOM;
+    flux.QOM_to_DOM=f.QOM2DOM;
+    flux.DOM_sorption_net=f.DOM2QOMnet;
+    flux.ENZN_production=l.enzyme_production_C;
+    flux.ENZN_to_MBA=l.enzyme_turnover_C;
     flux.N_overflow_CO2=overflow;
     rc=zeros(n,1);rn=rc;
     for key=fieldnames(c)',k=key{1};rc=rc+cc.(k)-c.(k);end
@@ -159,6 +168,13 @@ function [candidate,organic,dom,mend,feedback]=advanceSourceCandidate( ...
         mend.equilibrium_sorption=struct('policy','linear_equilibrium_stage_split', ...
             'doc_sorbed_change_g_cm3',afterC.sorbed_g_cm3_bulk-cp.sorbed_g_cm3_bulk, ...
             'don_sorbed_change_g_cm3',afterN.sorbed_g_cm3_bulk-np.sorbed_g_cm3_bulk);
+        % Linear-equilibrium sorption is an algebraic repartition rather than
+        % a pair of kinetic gross rates. Report its accepted net redistribution
+        % while retaining zero gross adsorption/desorption diagnostics.
+        flux.DOM_to_QOM(:)=0;
+        flux.QOM_to_DOM(:)=0;
+        flux.DOM_sorption_net=flip(afterC.sorbed_g_cm3_bulk- ...
+            cp.sorbed_g_cm3_bulk)./bt.*1000;
     end
     candidate=struct('state',s,'doc_total_g_cm3',dom.doc_total_g_cm3, ...
         'co2_c_rate_ug_cm3_s',flip((s.IC-accepted.IC).*bt.*1000./dt_s), ...

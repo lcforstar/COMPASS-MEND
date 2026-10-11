@@ -42,6 +42,11 @@ function [C_pools_out, C_diag] = turnoverCarbonMirror( ...
 %   Variable class: C_pools — prognostic state, N_diag — input forcing, C_diag — diagnostic
 %
 %   Author: Zhu Jizixing 2026-05-21 (M2-B.8 S3)
+%   Change: 2026-09-30 Wenjie Liu -- winter wheat accepts only zero xsmr.
+%   Actual respiration is now paid from physical NSC before harvest; do not
+%   clear unpaid debt or label it an atmospheric flux/physical carbon source.
+%   Change: 2026-09-30 Wenjie Liu -- use the jointly C/N-limited seed from
+%   the N turnover transaction and ledger all residual annual crop stores.
 
     C_pools_out = C_pools_in;
     C_diag = struct('C_harvest_today',0, 'C_leaf_litter_today',0, ...
@@ -172,6 +177,12 @@ end
 
 function [p, d] = winterWheatTurnoverC(p, d, nd, prm)
 % Carbon mirror of the CoLM crop emergence/harvest event.
+% COMPASS physical crop funding deliberately excludes signed xsmr cleanup.
+if isfield(p,'C_xsmr')
+    assert(isscalar(p.C_xsmr)&&isfinite(p.C_xsmr)&&p.C_xsmr==0, ...
+        'turnoverCarbonMirror:winterWheatDebt', ...
+        'Winter-wheat carbon debt cannot be written off; use a new physical-funding trajectory.');
+end
 if isfield(nd, 'crop_emergence_event') && nd.crop_emergence_event
     p.C_leaf = p.C_leaf + p.C_fruit;
     p.C_fruit = 0;
@@ -179,14 +190,22 @@ end
 if ~isfield(nd, 'crop_harvest_event') || ~nd.crop_harvest_event
     return;
 end
-seedC = min(p.C_fruit, prm.initial_seed_c);
+assert(isfield(nd,'crop_seed_carbon') && isscalar(nd.crop_seed_carbon) ...
+    && isfinite(nd.crop_seed_carbon) && nd.crop_seed_carbon >= 0 ...
+    && nd.crop_seed_carbon <= min(p.C_fruit,prm.initial_seed_c), ...
+    'turnoverCarbonMirror:missingCropSeedContract', ...
+    'Crop harvest requires the jointly inventory-limited seed C/N decision.');
+seedC = nd.crop_seed_carbon;
 % Change: 2026-09-09 Jizixing Zhu -- Changwu NM/NPM management: remove
 % all standing shoot residue at harvest (Su Fuyuan thesis, pp.15-16).
 % Harvest ledger is total off-field C, not grain-only yield. Seed reserve
 % and root litter retain their existing ownership; apple branch unchanged.
-d.C_harvest_today = p.C_fruit - seedC + p.C_leaf + p.C_livestem + p.C_deadstem;
+d.C_harvest_today = p.C_fruit - seedC + p.C_leaf + p.C_livestem + ...
+    p.C_deadstem + p.C_stem_storage;
 d.C_leaf_litter_today = 0;
-d.C_root_litter_today = p.C_root_fine + p.C_livecroot + p.C_deadcroot;
+d.C_root_litter_today = p.C_root_fine + p.C_livecroot + p.C_deadcroot + p.C_root_storage;
+p.C_root_storage = 0;
+p.C_stem_storage = 0;
 p.C_leaf = 0;
 p.C_root_fine = 0;
 p.C_livestem = 0;
@@ -195,18 +214,11 @@ p.C_livecroot = 0;
 p.C_deadcroot = 0;
 p.C_fruit = seedC;
 
-% CLM5 CNCStateUpdate1Mod.F90:435-461 and CoLM
-% MOD_BGC_CNCStateUpdate1.F90:473-481 clear residual crop cpool and xsmrpool
-% at harvest. C_xsmr<=0 is a signed maintenance-debt state, not physical
-% carbon. Its reset is a bookkeeping source and must not be reported as
-% negative atmospheric CO2. Positive xsmr, if supplied by a nonstandard
-% caller, remains physical carbon and is released.
+% Release only physical remaining labile carbon. The historical CLM/CoLM
+% signed-xsmr cleanup is not used by this physical-funding crop trajectory.
+% Keep zero-valued legacy diagnostic fields for output schema compatibility;
+% historical cum_C_xsmr_writeoff remains readable but cannot grow here.
 d.C_cpool_to_atm_today = p.C_labile;
-if isfield(p, 'C_xsmr')
-    d.C_xsmr_to_atm_today = max(p.C_xsmr, 0);
-    d.C_xsmr_debt_writeoff_today = max(-p.C_xsmr, 0);
-    p.C_xsmr = 0;
-end
 d.C_crop_cleanup_to_atm_today = d.C_cpool_to_atm_today + d.C_xsmr_to_atm_today;
 p.C_labile = 0;
 end
@@ -222,3 +234,11 @@ function cn = poolCN(C_pool, N_pool, cn_fallback)
         cn = cn_fallback;
     end
 end
+
+% Change: 2026-09-30 Wenjie Liu -- export standing senescent leaf C and
+% residual annual stem WSC at the single applied crop harvest event.
+% Carbon mirror of the CoLM crop emergence/harvest event.
+% COMPASS physical crop funding deliberately excludes signed xsmr cleanup.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

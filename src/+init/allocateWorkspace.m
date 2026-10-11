@@ -385,3 +385,11 @@ function t = turnoverDiagTemplate(tS)
     t = repmat(struct('harvest_today', [], 'leaf_litter_today', [], ...
         'root_litter_today', [], 'storage_release_today', []), tS, 1);
 end
+
+% Change: 2026-09-30 Wenjie Liu -- predeclare annual stem WSC and
+% standing-senescence applied diagnostics for transactional C/N updates.
+% tS x 1 struct array; numeric defaults (resp_beta_sub/resp_theta_actual = 1).
+% Field list + defaults MUST match setInitialNitrogen.m:303-312 (applyNSCCoupling writer).
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

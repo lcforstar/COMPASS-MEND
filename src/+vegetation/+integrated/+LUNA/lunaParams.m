@@ -23,6 +23,11 @@ function p = lunaParams(jmaxb1_override)
 %   Source file: D:\OneDrive\CTSM-release-clm5.0.37\src\biogeophys\LunaMod.F90:55-78
 %
 %   Author: Zhu Jizixing, 2026-05-20 (M2-B.3 LUNA implementation)
+% Change: 2026-09-30 Wenjie Liu -- share the existing functional-leaf-N
+% ceiling with the accepted-N capacity projection; its value is unchanged.
+% Change: 2026-09-30 Wenjie Liu -- roll back this round's leaf-N LUNA
+%   extension to the frozen COMPASS implementation; historical records above
+%   are retained. Winter-wheat C/N allocation is handled separately.
 
     % Carbon conversion
     p.Cv = 1.2e-5 * 3600;             % [g C / (μmol CO2 · s) × s/h] → g C/(μmol CO2 · h)

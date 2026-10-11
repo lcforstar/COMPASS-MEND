@@ -1,5 +1,7 @@
 function flushToNetCDF(reg, output_dir, run_metadata, maxKT)
 %FLUSHTONETCDF  Write all registered diagnostics into per-group NetCDF files.
+% Change: 2026-09-29 Wenjie Liu -- retain organic input/top-output ledgers
+% as float64, matching existing bottom-export conservation precision.
 %
 % Layout (per design doc docs/netcdf_output_design_decisions.md):
 %   data/output_<tag>/
@@ -25,6 +27,9 @@ function flushToNetCDF(reg, output_dir, run_metadata, maxKT)
 %                      = reg.tS (full buffer == end-of-run flush behaviour).
 % Change: 2026-08-30 Codex -- persist conservation-group diagnostics as
 %   float64 to prevent false cumulative-closure failures from float32 output.
+% Change: 2026-09-22 Wenjie Liu -- retain source-label precision and export
+%   layer center/bounds/thickness coordinates for depth-resolved pathways.
+% Change: 2026-09-29 Wenjie Liu -- retain particle export ledgers as float64.
 
     if ~exist(output_dir, 'dir'); mkdir(output_dir); end
 
@@ -113,6 +118,28 @@ function flushToNetCDF(reg, output_dir, run_metadata, maxKT)
                 'axis',      'Z'});
         end
 
+        any_layer=false;
+        for vi=1:numel(var_names)
+            md=reg.getMeta(var_names{vi});
+            if any(strcmp(md.dims,'layer')),any_layer=true;break;end
+        end
+        if any_layer
+            assert(numel(depth_node)==reg.NL+1&&all(isfinite(depth_node)) ...
+                &&all(diff(depth_node)>0),'diagnostics:flush:LayerGeometry', ...
+                'Layer coordinates require NL+1 strictly increasing surface-down nodes.');
+            upper=depth_node(1:end-1);lower=depth_node(2:end);
+            values={(upper+lower)./2,upper,lower,lower-upper};
+            keys={'depth_layer','depth_layer_top','depth_layer_bottom','layer_thickness'};
+            labels={'Layer center depth','Layer upper-face depth', ...
+                'Layer lower-face depth','Layer thickness'};
+            for ci=1:numel(keys)
+                nccreate(nc_path,keys{ci},'Dimensions',{'layer',reg.NL},'Datatype','double');
+                ncwrite(nc_path,keys{ci},values{ci});
+                varAttrs=addVarAttrs(varAttrs,keys{ci},{'units','cm'; ...
+                    'long_name',labels{ci};'positive','down'});
+            end
+        end
+
         % --- write variables ---
         for vi = 1:numel(var_names)
             name = var_names{vi};
@@ -135,7 +162,12 @@ function flushToNetCDF(reg, output_dir, run_metadata, maxKT)
             % large cumulative ledgers. Float32 quantization previously made
             % a closed NH4 ledger appear to fail by about 1e-3 ug cm^-2.
             dataType='single'; fillValue=single(md.fill_value); writeBuf=single(buf);
-            if strcmp(md.group,'conservation')
+            % Change: 2026-09-29 Wenjie Liu -- DOM export/transport ledgers
+            % retain double precision for independently reconstructed balances.
+            if strcmp(md.group,'conservation')||startsWith(name,'fertilizer_tracer_') ...
+                    ||startsWith(name,{'doc_bottom_outflow_','don_bottom_outflow_', ...
+                        'doc_top_','don_top_','doc_bottom_inflow_','don_bottom_inflow_', ...
+                        'doc_transport_','don_transport_','bioparticle_'})
                 dataType='double'; fillValue=double(md.fill_value); writeBuf=double(buf);
             end
             % create with deflate=5 for compression
@@ -152,6 +184,9 @@ function flushToNetCDF(reg, output_dir, run_metadata, maxKT)
                 attrs(end+1, :) = {'standard_name', md.standard_name}; %#ok<AGROW>
             end
             attrs(end+1, :) = {'units', md.units}; %#ok<AGROW>
+            if any(strcmp(md.dims,'layer'))
+                attrs(end+1,:)={'coordinates','depth_layer'}; %#ok<AGROW>
+            end
             if ~isempty(md.comment)
                 attrs(end+1, :) = {'comment', md.comment}; %#ok<AGROW>
             end

@@ -36,6 +36,7 @@ function spec = tableSpec(kind)
 %     the static soil-parameter table.
 %   Change: 2026-09-02 Codex -- remove site-global organic-model and retired
 %     DON-MM fields; soil.csv now contains only depth-resolved quantities.
+%   Change: 2026-09-29 Wenjie Liu -- catalogue layer-resolved MEND carbon kinetics.
 
     switch lower(kind)
         case 'soil'
@@ -64,6 +65,11 @@ function spec = tableSpec(kind)
                 'dom_disp_cm','cm','attachment_1d','1/d', ...
                 'detachment_1d','1/d','straining_1d','1/d', ...
                 'microbe_disp_cm','cm');
+            mend=io.adapters.mendLayerParameterSpec();
+            spec.optional=[spec.optional,mend.names];
+            for j=1:numel(mend.names)
+                spec.units.(mend.names{j})=mend.units{j};
+            end
 
         case 'initial'
             spec.kind   = 'initial';

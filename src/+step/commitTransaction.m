@@ -20,6 +20,9 @@ function model = commitTransaction(model, transaction, kt)
 %   Editor: Jizixing Zhu; Date: 2026-07-20.
 %   Change: 2026-07-20 Jizixing Zhu -- project compatibility outputs from the
 %     validated typed ledger after all domain candidates commit.
+% Change: 2026-09-30 Wenjie Liu -- restore the frozen three-argument
+%   vegetation/LUNA commit interface when removing this round's leaf-N
+%   feedback extension; accepted soil and C/N transaction logic is unchanged.
     interfaces.validateTransaction(transaction);
     model.built = soil.commitCandidate(model.built, transaction.candidate.soil);
     model.built = surface.commitCandidate( ...

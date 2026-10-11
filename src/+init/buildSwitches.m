@@ -25,6 +25,8 @@ function sw = buildSwitches(rawConfig)
 % Change: 2026-08-28 Codex -- make soil_carbon_model the master switch;
 %   organic N follows it and all dependent soil-C modules are forced off when
 %   the master is false. Only soil_carbon_model is accepted.
+% Change: 2026-09-21 Wenjie Liu -- add the one-way mineral-fertilizer N
+%   source tracer without coupling it into any total-N process switch.
 
     s = rawConfig.switches;
     sw = struct();
@@ -69,6 +71,8 @@ function sw = buildSwitches(rawConfig)
     sw.lLitterInput = readOptionalBool(s, 'litter_input', false);
     sw.lMicrobialDormancy = readOptionalBool(s, 'microbial_dormancy', false);
     sw.lMicrobialTransport = readOptionalBool(s, 'microbial_transport', false);
+    sw.lFertilizerSourceTracer = readOptionalBool( ...
+        s, 'fertilizer_source_tracer', false);
     if sw.lSoilOrganic == 0
         sw.lSoilDOM = 0;
         sw.lExplicitSoilMicrobes = 0;

@@ -17,6 +17,10 @@ function built = commitCandidate(built, candidate, kt)
 %     lag and preventing rejected soil trials from contaminating plant memory.
 %
 %   Editor: Jizixing Zhu; Date: 2026-07-20.
+% Change: 2026-09-30 Wenjie Liu -- supply the accepted date to daily LUNA.
+% Change: 2026-09-30 Wenjie Liu -- restore the frozen three-argument
+%   vegetation/LUNA commit interface when removing this round's leaf-N
+%   feedback extension; accepted soil and C/N transaction logic is unchanged.
     required = {'vegetation','canopy_water','leaf_resp_Ta', ...
         'luna_climate_entry'};
     for i = 1:numel(required)

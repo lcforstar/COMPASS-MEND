@@ -56,6 +56,12 @@ function [C_pools_new, diag] = computeCarbonAllocation( ...
 %   Author: Zhu Jizixing 2026-05-21 (M2-B.8 S2)
 % Change: 2026-06-28 Jizixing Zhu — allometry branch treats empty []  froot_leaf/stem_leaf
 %   as 0 (was 1+f1+[] -> [] -> 1/[] dimension error when a PFT sets one ratio but not the other).
+% Change: 2026-09-30 Wenjie Liu -- physical winter-wheat funding remobilizes
+%   each positive reserve within its actual inventory, without a denominator
+%   floor that can withdraw carbon from an empty stem at tiny root stocks.
+% Change: 2026-09-30 Wenjie Liu -- winter crops keep mobile C but do not
+%   load perennial wood reserves; grain-fill whole-pool C:N limits allow
+%   previously synthesized tissue to lose N without deleting its carbon.
 
     % [F2 stage-13a / #1] phen_alloc optional (10th arg): struct of phenology drivers
     % for allocation. .gdd_budburst [°C·d] drives the leaf taper; .DS_fruit [-] gates
@@ -109,7 +115,8 @@ function [C_pools_new, diag] = computeCarbonAllocation( ...
             f_root  = phen_alloc.crop_a_root;
             f_stem  = phen_alloc.crop_a_stem;
             f_fruit = phen_alloc.crop_a_repr;
-            if ~phen_alloc.crop_live
+            if ~phen_alloc.crop_live || (isfield(phen_alloc,'crop_mature_flag') ...
+                    && phen_alloc.crop_mature_flag)
                 f_leaf = 0; f_root = 0; f_stem = 0; f_fruit = 0;
             end
         elseif isfield(pftParams, 'use_fruittree_alloc') && pftParams.use_fruittree_alloc == 1
@@ -246,7 +253,19 @@ function [C_pools_new, diag] = computeCarbonAllocation( ...
             %   A_N_g.N_* = 本步分配后器官 N 池 (gN/m²)。
             %   对标 CLM5 NutrientCompetitionFlexibleCNMod.F90:1660-1664 (leafcn 在 [target±10] 浮动)。
             off = pftParams.cn_flex_offset;                 % [gC/gN] 带半幅
-            A_C_leaf  = clampPoolCN(A_C_leaf,  C_pools_prev.C_leaf,      A_N_g.N_leaf,  pftParams.CN_L           + off);
+            leaf_CN_max = pftParams.CN_L + off;
+            stem_CN_max = pftParams.CN_lw + off;
+            root_CN_max = pftParams.CN_target_root + off;
+            if use_crop_alloc && isfield(pftParams,'winter_wheat_cn') ...
+                    && isequal(pftParams.winter_wheat_cn,1) ...
+                    && isfield(phen_alloc,'crop_phase') && phen_alloc.crop_phase == 3
+                % Growth demand still uses the base tissue C:N. Only the
+                % ceiling on the existing, N-remobilized total pool changes.
+                leaf_CN_max = max(leaf_CN_max,pftParams.CN_leaf_grainfill);
+                stem_CN_max = max(stem_CN_max,pftParams.CN_stem_grainfill);
+                root_CN_max = max(root_CN_max,pftParams.CN_root_grainfill);
+            end
+            A_C_leaf  = clampPoolCN(A_C_leaf,  C_pools_prev.C_leaf,      A_N_g.N_leaf, leaf_CN_max);
             if pftParams.CN_target_stem > 0
                 % [13c per-pool clamp 2026-06-12] Clamp livestem vs CN_lw and deadstem vs CN_dw
                 %   SEPARATELY, then recombine. The old single clamp used TOTAL stem C:N vs
@@ -254,7 +273,7 @@ function [C_pools_new, diag] = computeCarbonAllocation( ...
                 %   so ALL fresh stem C was clamped to 0 (A_C_stem=0 all year -> stem never grew ->
                 %   coarse-root-via-stem = 0). Split A_C_stem by flivewd, clamp each wood type within
                 %   its own C:N ceiling (live CN_lw, dead CN_dw). A_C_ls/A_C_ds reused at pool update.
-                A_C_livestem = clampPoolCN(A_C_stem * pftParams.flivewd,       C_pools_prev.C_livestem, A_N_g.N_livestem, pftParams.CN_lw + off);
+                A_C_livestem = clampPoolCN(A_C_stem * pftParams.flivewd,       C_pools_prev.C_livestem, A_N_g.N_livestem, stem_CN_max);
                 A_C_deadstem = clampPoolCN(A_C_stem * (1 - pftParams.flivewd), C_pools_prev.C_deadstem, A_N_g.N_deadstem, pftParams.CN_dw + off);
                 A_C_stem = A_C_livestem + A_C_deadstem;
             end
@@ -267,7 +286,7 @@ function [C_pools_new, diag] = computeCarbonAllocation( ...
         A_C_livecroot = f2_croot * A_C_livestem;                   % = f2*livestem (src :563); 0 if f2=0 (non-woody)
         A_C_deadcroot = f2_croot * A_C_deadstem;
         if strcmp(cn_mode, 'flexible_cn')
-            A_C_root = clampPoolCN(A_C_root, C_pools_prev.C_root_fine, A_N_g.N_root, pftParams.CN_target_root + off);
+            A_C_root = clampPoolCN(A_C_root, C_pools_prev.C_root_fine, A_N_g.N_root, root_CN_max);
             if pftParams.croot_stem_alloc > 0
                 A_C_livecroot = clampPoolCN(A_C_livecroot, C_pools_prev.C_livecroot, A_N_g.N_livecroot, pftParams.CN_lw + off);
                 A_C_deadcroot = clampPoolCN(A_C_deadcroot, C_pools_prev.C_deadcroot, A_N_g.N_deadcroot, pftParams.CN_dw + off);
@@ -326,8 +345,15 @@ function [C_pools_new, diag] = computeCarbonAllocation( ...
     %   See docs/superpowers/plans/2026-06-10-target-driven-nsc-reserve.md
     if isfield(pftParams, 'nsc_frac'), nsc_frac = pftParams.nsc_frac; else, nsc_frac = 0.07; end  % [-] woody NSC C-fraction
     C_stem_wood_prev = C_pools_prev.C_livestem + C_pools_prev.C_deadstem;         % [g C/m2] perennial AG wood
-    [target_stem_storage, target_root_storage] = ...
-        vegetation.carbon.computeReserveTarget(C_stem_wood_prev, croot_stem, nsc_frac);
+    if isfield(pftParams,'winter_wheat_cn') && isequal(pftParams.winter_wheat_cn,1)
+        % CoLM annual crop fcur=1: no perennial display-storage loading.
+        % Unallocated assimilate remains in the physical C_labile pool.
+        target_stem_storage = 0;
+        target_root_storage = 0;
+    else
+        [target_stem_storage, target_root_storage] = ...
+            vegetation.carbon.computeReserveTarget(C_stem_wood_prev, croot_stem, nsc_frac);
+    end
     % [target-driven 2026-06-10 STAGE 2] Reserve loading REPLACED. Instead of the fixed (1-fcur) skim of
     %   each organ's allocation, each woody reserve refills from the SURPLUS of C_labile (what is left
     %   after the current-year display growth is funded) TOWARD its wood-based target, with a FATES
@@ -359,8 +385,18 @@ function [C_pools_new, diag] = computeCarbonAllocation( ...
     stem_stor_av   = max(C_pools_prev.C_stem_storage, 0);                         % [g C/m2] reserve available
     stor_av_tot    = root_stor_av + stem_stor_av;                                 % [g C/m2]
     C_storage_to_labile = min(labile_deficit, stor_av_tot);                       % [g C/m2] starch -> sugar this step
-    draw_root      = C_storage_to_labile * (root_stor_av / max(stor_av_tot, 1e-12));   % split by available reserve
-    draw_stem      = C_storage_to_labile - draw_root;
+    if isfield(pftParams,'winter_wheat_cn')&&isequal(pftParams.winter_wheat_cn,1)
+        draw_root=0;draw_stem=0;
+        if stor_av_tot>0
+            draw_root=min(root_stor_av,C_storage_to_labile*(root_stor_av/stor_av_tot));
+            draw_stem=min(stem_stor_av,max(C_storage_to_labile-draw_root,0));
+            draw_root=min(root_stor_av,max(C_storage_to_labile-draw_stem,0));
+        end
+        C_storage_to_labile=draw_root+draw_stem; % actual conservative transfer
+    else
+        draw_root = C_storage_to_labile * (root_stor_av / max(stor_av_tot, 1e-12));
+        draw_stem = C_storage_to_labile - draw_root;
+    end
     % (fcur skim removed: A_C_* stay full; storage filled from surplus above, not an fcur fraction)
 
     % --- Step 4: C 池更新 (mass balance) ---
@@ -435,3 +471,9 @@ function A_C = clampPoolCN(A_C, C_prev, N_new, CN_max)
         A_C = 0;   % 无 N → 该器官 C:N 无界, 不分配 C (全留 C_labile)
     end
 end
+
+% Change: 2026-09-30 Wenjie Liu -- split vegetative stem growth into
+%   structural tissue and N-free annual WSC; stop organ growth at maturity.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

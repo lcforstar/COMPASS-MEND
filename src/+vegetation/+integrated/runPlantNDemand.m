@@ -53,67 +53,35 @@ function [demand_ctx, root_uptake_ctx] = runPlantNDemand( ...
 %     demand_ctx, root_uptake_ctx — computed context (out, 给下游函数复用)
 %
 %   Author: Zhu Jizixing 2026-05-22 (M2-B.8c 二期重构 S1)
+% Change: 2026-09-30 Wenjie Liu -- consume one compiled parameter view so
+% site C:N overrides govern demand and downstream allocation consistently.
+%   Change: 2026-09-30 Wenjie Liu -- forward the crop physical-NSC funding
+%   gate to resp_only so N demand and applied C allocation share one budget.
+%   Change: 2026-09-30 Wenjie Liu -- annual winter wheat takes only the
+%   current growth N deficit after existing mobile N; no woody/next-year
+%   reserve demand. Other PFT demand equations are unchanged.
 
     % ---------- PFT params (一次性加载, 后续函数复用) ----------
     pftType = cfg.Veg.PFT_type;
 
-    pftP_demand = struct( ...
-        'r_m10',          vegetation.getPFTValue(pftType, 'r_m10'), ...         % Sitch 2003 Table 3
-        'R_g_fraction',   vegetation.getPFTValue(pftType, 'R_g_fraction'), ...  % Sitch 2003 p.169
-        'has_fruit',      vegetation.getPFTValue(pftType, 'has_fruit'), ...
-        'f_alloc_leaf',   vegetation.getPFTValue(pftType, 'f_alloc_leaf'), ...
-        'f_alloc_root',   vegetation.getPFTValue(pftType, 'f_alloc_root'), ...
-        'f_alloc_stem',   vegetation.getPFTValue(pftType, 'f_alloc_stem'), ...
-        'f_alloc_fruit',  vegetation.getPFTValue(pftType, 'f_alloc_fruit'), ...
-        'use_fruittree_alloc', vegetation.getPFTValue(pftType, 'use_fruittree_alloc', 0), ... % [F2/13a] 1=route apple alloc through GDD leaf taper + fruit gate; 0=legacy (other PFTs)
-        'ft_GDDlfmat',    vegetation.getPFTValue(pftType, 'ft_GDDlfmat', 0), ...   % [F2/13a] GDD bud-break->canopy maturity (leaf taper -> 0)
-        'ft_bfact',       vegetation.getPFTValue(pftType, 'ft_bfact', 0), ...      % [F2/13a] J-Norman leaf-taper shape factor
-        'harvest_DS',     vegetation.getPFTValue(pftType, 'harvest_DS', 0.95), ... % [#1] DS_fruit at harvest = GDD fruit-gate upper bound
-        'fleafi',         vegetation.getPFTValue(pftType, 'fleafi',    0), ...  % [13a] 4-phase: initial leaf fraction of (1-aroot)
-        'arooti',         vegetation.getPFTValue(pftType, 'arooti',    0), ...  % [13a] bud-break root fraction
-        'arootf',         vegetation.getPFTValue(pftType, 'arootf',    0), ...  % [13a] phase-1-end root fraction
-        'arootf2',        vegetation.getPFTValue(pftType, 'arootf2',   0), ...  % [13a] fruit-phase root fraction
-        'astemf',         vegetation.getPFTValue(pftType, 'astemf',    0), ...  % [13a] mature stem fraction floor
-        'aleafstor',      vegetation.getPFTValue(pftType, 'aleafstor', 0), ...  % [13a] post-harvest leaf->storage fraction
-        'grnfill',        vegetation.getPFTValue(pftType, 'grnfill', 400), ...  % [13a] GDD bud-break->fruit-fill start
-        'grnrp',          vegetation.getPFTValue(pftType, 'grnrp', 1100), ...   % [5-phase 2026-06-13] GDD bud-break->ripening (huiripe), P2/P3 boundary
-        'hybgdd',         vegetation.getPFTValue(pftType, 'hybgdd', 2880), ...  % [13a] GDD bud-break->physiological maturity
-        'CN_L',           vegetation.getPFTValue(pftType, 'CN_L'), ...
-        'CN_target_root', vegetation.getPFTValue(pftType, 'CN_target_root'), ...
-        'CN_target_stem', vegetation.getPFTValue(pftType, 'CN_target_stem'), ...
-        'CN_target_fruit',vegetation.getPFTValue(pftType, 'CN_target_fruit'), ...
-        'flivewd',        vegetation.getPFTValue(pftType, 'flivewd'), ...     % [13c] new stem C/N fraction to live wood
-        'CN_lw',          vegetation.getPFTValue(pftType, 'CN_lw'), ...       % [13c] live wood C:N
-        'CN_dw',          vegetation.getPFTValue(pftType, 'CN_dw'), ...       % [13c] dead wood C:N
-        'froot_leaf',       vegetation.getPFTValue(pftType, 'froot_leaf', 0), ...       % [fine-root 2026-06-12] CLM5 f1 fine-root:leaf
-        'croot_stem_alloc', vegetation.getPFTValue(pftType, 'croot_stem_alloc', 0), ... % [coarse-root 2026-06-12] NPP coarse:stem ratio
-        'stem_leaf',        vegetation.getPFTValue(pftType, 'stem_leaf', 0), ...        % [CLM5 all-PFT 2026-06-13] f3 stem:leaf (natural woody; apple uses GDD-phase astem)
-        'resp_scheme',      vegetation.getPFTValue(pftType, 'resp_scheme', 0), ...
-        'resp_Km',          vegetation.getPFTValue(pftType, 'resp_Km', 2), ...
-        'resp_jones_kf',    vegetation.getPFTValue(pftType, 'resp_jones_kf', 0.227), ...
-        'resp_jones_Yg',    vegetation.getPFTValue(pftType, 'resp_jones_Yg', 0.75), ...
-        'xsmr_recovery_days', vegetation.getPFTValue(pftType, 'xsmr_recovery_days', 30), ...
-        'clm_crop_respiration', vegetation.getPFTValue(pftType, 'clm_crop_respiration', 0), ...
-        'clm_br_s',         vegetation.getPFTValue(pftType, 'clm_br_s', 2.525e-6), ...
-        'clm_br_root_s',    vegetation.getPFTValue(pftType, 'clm_br_root_s', 2.525e-6), ...
-        'clm_resp_Q10',     vegetation.getPFTValue(pftType, 'clm_resp_Q10', 1.5), ...
-        'crop_phenology', vegetation.getPFTValue(pftType, 'crop_phenology'), ... % [F3] grass-crop vs tree
-        'nrelocfrac',     vegetation.getPFTValue(pftType, 'nrelocfrac'), ...      % [F3] N retransloc frac, for labile storage target
-        'cn_flex_offset', cfg.Veg.cn_flex_offset, ...  % [gC/gN] [v12] C:N 弹性半幅 (allocatePlantN actual_CN clamp)
-        'fcur',           cfg.Veg.fcur, ...            % [-] 当年显示比例, (1−fcur)→storage (CLM5 fcur, 修 C_storage 夏末砸0)
-        'storage_cushion', cfg.Veg.storage_cushion, ... % [-] [v8] C_storage 目标 = cushion × C_leaf (FATES)
-        'SLA0',           vegetation.getPFTValue(pftType, 'SLA0', 0), ...   % [peaklai] m2/gC top-canopy SLA, for LAI=f(C_leaf) cap check
-        'SLAm',           vegetation.getPFTValue(pftType, 'SLAm', 0), ...   % [peaklai] m2/gC/LAI SLA canopy gradient
-        'laimx',          vegetation.getVegetationProperty(cfg.Veg, 'laimx', {}, 0));  % [peaklai] physiological peak LAI; LAI>=laimx -> leaf alloc -> root (CLM5-FruitTree CNVegStructUpdateMod.F90:173-181)
+    assert(isfield(cfg.Veg, 'plant_cn') && ...
+        isfield(cfg.Veg.plant_cn, 'resolved'), ...
+        'runPlantNDemand:missingCompiledParameters', ...
+        'Demand requires the immutable compiled PlantCN parameter view.');
+    pftP_demand = cfg.Veg.plant_cn.resolved;
+    pftP_demand.cn_flex_offset = cfg.Veg.cn_flex_offset;
+    pftP_demand.fcur = cfg.Veg.fcur;
+    pftP_demand.storage_cushion = cfg.Veg.storage_cushion;
+    pftP_demand.laimx = cfg.Veg.laimx;
 
     % Nacry root-membrane PFT params (M1)
-    Vmax_NH4_pft = vegetation.getPFTValue(pftType, 'Vmax_NH4_umol_g_h');
-    Vmax_NO3_pft = vegetation.getPFTValue(pftType, 'Vmax_NO3_umol_g_h');
-    Km_NH4_pft   = vegetation.getPFTValue(pftType, 'Km_NH4');
-    Km_NO3_pft   = vegetation.getPFTValue(pftType, 'Km_NO3');
-    Cmin_NH4_pft = vegetation.getPFTValue(pftType, 'Cmin_NH4');
-    Cmin_NO3_pft = vegetation.getPFTValue(pftType, 'Cmin_NO3');
-    SRL_pft      = vegetation.getPFTValue(pftType, 'SRL');
+    Vmax_NH4_pft = pftP_demand.Vmax_NH4_umol_g_h;
+    Vmax_NO3_pft = pftP_demand.Vmax_NO3_umol_g_h;
+    Km_NH4_pft   = pftP_demand.Km_NH4;
+    Km_NO3_pft   = pftP_demand.Km_NO3;
+    Cmin_NH4_pft = pftP_demand.Cmin_NH4;
+    Cmin_NO3_pft = pftP_demand.Cmin_NO3;
+    SRL_pft      = pftP_demand.SRL;
 
     daisyParams = struct( ...
         'r_root_m', plantHydro.r_root_m, ...
@@ -223,6 +191,15 @@ function [demand_ctx, root_uptake_ctx] = runPlantNDemand( ...
     %   leaving only the regrow term that tracked seasonal-inflated C_leaf -> N_labile ~22).
     %   fnstorage = 0.3 (LPJ-GUESS europe.ins:288, boreal/temperate tree default;
     %   0.05-0.15 herb/grass — apple is a tree, 0.3 applies).
+    if pftP_demand.winter_wheat_cn == 1
+        % CoLM NutrientCompetition (commit 626347a, lines 506-526) deploys
+        % retranslocated N before requesting soil N. COMPASS uses N_labile
+        % as the within-season mobile pool (including grain-fill retrans N).
+        % This is not a perennial reserve or an additional uptake source.
+        demand_total_g_m2_s = max(0, D_N_for_demand.total - ...
+            N_labile_for_demand / Delt_t);
+        if crop_is_inactive, demand_total_g_m2_s = 0; end
+    else
     fnstorage = 0.3;                                                    % [-] LPJ-GUESS tree default
     sap_term = C_livestem_prev_demand / max(pftP_demand.CN_L, 1) * fnstorage;   % [g N/m²] sapwood capacity
     regrow_term = (C_leaf_prev_demand / max(pftP_demand.CN_L, 1) ...
@@ -245,6 +222,7 @@ function [demand_ctx, root_uptake_ctx] = runPlantNDemand( ...
     N_reserve_for_demand = N_labile_for_demand + N_storage_for_demand;  % [g N/m2] LPJ nstore()
     storage_deficit = max(0, N_labile_target - N_reserve_for_demand);   % [g N/m2], 0 when reserve full
     demand_total_g_m2_s = D_N_for_demand.total + storage_deficit / Delt_t;
+    end
 
     % ---------- NH4/NO3 拆分 (生理偏好) ----------
     vmax_total = Vmax_NH4_pft + Vmax_NO3_pft;
@@ -286,6 +264,7 @@ function [demand_ctx, root_uptake_ctx] = runPlantNDemand( ...
     demand_ctx = struct( ...
         'pftType',            pftType, ...
         'pftP_demand',        pftP_demand, ...
+        'plant_cn_params',    cfg.Veg.plant_cn, ...
         'GPP_for_demand',     GPP_for_demand, ...
         'Rd_leaf_for_demand', Rd_leaf_for_demand, ...
         'T_air_demand',       T_air_demand, ...
@@ -305,3 +284,7 @@ end
 % Change: 2026-08-24 Jizixing Zhu -- forward fixed CLM5/CoLM crop
 % respiration and xsmr recovery parameters, and gate post-harvest crop
 % assimilation out of the PlantCN ledger.
+
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

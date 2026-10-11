@@ -11,10 +11,21 @@ function [state, diag] = winterWheatPhenology(state, p, forcing, doy)
 % time representation from CoLM subdaily rates to one daily update.
 %
 % Editor: Jizixing Zhu; Date: 2026-08-24.
+% Change: 2026-09-30 Wenjie Liu -- observed_lai_zero management separates
+%   the unchanged CoLM thermal maturity criterion from physical harvest.
+%   The awaiting-harvest crop remains phase 3/live, stops organ allocation,
+%   and retains its physical pools. thermal_maturity preserves the reference
+%   branch. Observed harvest is an explicit COMPASS management adaptation.
 
 state.crop_planting_event = false;
 state.crop_emergence_event = false;
 state.crop_harvest_event = false;
+state.crop_grainfill_event = false;
+state.crop_maturity_event = false;
+if ~isfield(state,'crop_mature_flag'), state.crop_mature_flag = false; end
+if ~isfield(state,'crop_season_id'), state.crop_season_id = 0; end
+observedHarvest = isfield(p,'crop_harvest_rule') ...
+    && strcmpi(p.crop_harvest_rule,'observed_lai_zero');
 state.onset_flag = false;
 state.offset_flag = false;
 
@@ -32,6 +43,8 @@ if ~state.crop_live && doy == p.sowing_day
     state.crop_a_repr = 0;
     state.budburst_doy = doy;
     state.harvested_flag = false;
+    state.crop_mature_flag = false;
+    state.crop_season_id = state.crop_season_id + 1;
 end
 
 if state.crop_live
@@ -49,7 +62,12 @@ if state.crop_live
 
     hui = state.crop_hui;
     idpp = state.crop_days_after_planting;
-    if hui >= 1 || idpp >= p.mxmat
+    reachesMaturity = hui >= 1 || idpp >= p.mxmat;
+    if reachesMaturity && ~state.crop_mature_flag
+        state.crop_mature_flag = true;
+        state.crop_maturity_event = true;
+    end
+    if reachesMaturity && ~observedHarvest
         state.crop_live = false;
         state.crop_phase = 4;
         state.crop_harvest_event = true;
@@ -61,8 +79,15 @@ if state.crop_live
         state.crop_a_root = 0;
         state.crop_a_stem = 0;
         state.crop_a_repr = 0;
+    elseif observedHarvest && state.crop_mature_flag
+        state.crop_phase = 3;
+        state.crop_a_leaf = 0;
+        state.crop_a_root = 0;
+        state.crop_a_stem = 0;
+        state.crop_a_repr = 0;
     elseif hui >= p.grnfill
         state.crop_phase = 3;
+        state.crop_grainfill_event = phaseBefore < 3;
         [state.crop_a_leaf, state.crop_a_root, state.crop_a_stem, ...
             state.crop_a_repr] = grainFillAllocation(state, p, hui);
     elseif hui >= p.lfemerg
@@ -92,7 +117,10 @@ diag = struct('phen', state.phen, 'crop_phase', state.crop_phase, ...
     'gddmaturity', state.crop_gddmaturity, 'vf', state.crop_vf, ...
     'planting_event', state.crop_planting_event, ...
     'emergence_event', state.crop_emergence_event, ...
-    'harvest_event', state.crop_harvest_event);
+    'harvest_event', state.crop_harvest_event, ...
+    'grainfill_event', state.crop_grainfill_event, ...
+    'maturity_event', state.crop_maturity_event, ...
+    'mature', state.crop_mature_flag);
 end
 
 function [aleaf, aroot, astem, arepr] = vegetativeAllocation(p, hui)

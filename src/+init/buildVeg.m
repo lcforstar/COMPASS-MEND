@@ -1,4 +1,6 @@
 function veg = buildVeg(raw, built)
+% Change: 2026-09-30 Wenjie Liu -- selectively restore COMPASS canopy
+% behavior; retain winter-wheat phenology and CoLM C/N allocation.
 %BUILDVEG  Build the static vegetation parameters from the [vegetation] config.
 %
 %   veg = init.buildVeg(raw, built) maps the friendly site.toml [vegetation]
@@ -36,6 +38,8 @@ function veg = buildVeg(raw, built)
 % Change: 2026-07-05 Jizixing Zhu — add veg.canopy.Ps_max_diurnal (env PS_MAX via io.getEnvDouble) + Ps_min_diurnal (moved from runtime.canopy_water; state-ownership migration increment 3 stage 1).
 % Change: 2026-07-16 Jizixing Zhu — resolve foliage clumping index from the selected PFT or an explicit site value and validate 0 < Omega <= 1.
 % Change: 2026-07-20 Jizixing Zhu — add optional heat_gs_* under photosynthesis (default enable=false).
+% Change: 2026-09-30 Wenjie Liu -- explicit annual-crop canopy/harvest policy;
+% fail fast for unsupported prognostic height/SAI rather than constant proxies.
 
     v = raw.config.vegetation;
     veg = struct();
@@ -126,6 +130,20 @@ function veg = buildVeg(raw, built)
     ph.beta_decay = getf(v, 'beta_decay', 1.0);
     ph.yr_cur   = getf(v, 'yr_cur', 11);
     ph.yr_full  = getf(v, 'yr_full', 12);
+    defaultHarvest = 'thermal_maturity';
+    isWinterWheat = vegetation.getPFTValue(s.PFT_type,'winter_wheat_cn',0)==1;
+    if isWinterWheat && strcmpi(c.LAI_mode,'data')
+        defaultHarvest = 'observed_lai_zero';
+    end
+    ph.crop_harvest_rule = lower(char(getf(v,'crop_harvest_rule',defaultHarvest)));
+    if ~ismember(ph.crop_harvest_rule,{'thermal_maturity','observed_lai_zero'})
+        error('buildVeg:badCropHarvestRule','Unknown crop_harvest_rule "%s".',ph.crop_harvest_rule);
+    end
+    if strcmp(ph.crop_harvest_rule,'observed_lai_zero') ...
+            && (~isWinterWheat || ~strcmpi(c.LAI_mode,'data'))
+        error('buildVeg:observedHarvestRequiresWheatData', ...
+            'observed_lai_zero requires Winter Wheat with LAI_mode=data.');
+    end
     veg.phenology = ph;
 
     % --- hydraulic: plant hydraulic scheme + dynamic params + tree fallback ---

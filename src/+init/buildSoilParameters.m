@@ -40,6 +40,8 @@ function soil = buildSoilParameters(rawSoil, domain, rawConfig)
 % Change: 2026-07-16 Jizixing Zhu -- document the descriptive soil initialization filename.
 % Change: 2026-09-02 Codex -- keep soil.csv depth-resolved: site-global
 %   AOM/DOM/MEMC/MEND/BIOPARTICLE parameters are owned by site.toml.
+% Change: 2026-09-29 Wenjie Liu -- map four MEND kinetic columns by the same
+%   public depth contract; retain h^-1 and mg C/g (no day/second conversion).
 
     if nargin < 3 || isempty(rawConfig)
         rawConfig = struct();
@@ -84,6 +86,11 @@ function soil = buildSoilParameters(rawSoil, domain, rawConfig)
     if has('detachment_1d');       T.bioparticle_detachment_rate_s = rawSoil.detachment_1d(:)'/86400; end
     if has('straining_1d');        T.bioparticle_straining_rate_s = rawSoil.straining_1d(:)'/86400; end
     if has('microbe_disp_cm');     T.bioparticle_dispersion_cm = rawSoil.microbe_disp_cm(:)'; end
+    mend=io.adapters.mendLayerParameterSpec();
+    for j=1:numel(mend.names)
+        key=mend.names{j};
+        if has(key),T.(key)=rawSoil.(key)(:)';end
+    end
 
     % NOTE: porosity is NOT set here. It depends on which bulk density wins
     % (soil.csv vs soil_initial_profile.csv), decided once in init.buildBulkDensity, after

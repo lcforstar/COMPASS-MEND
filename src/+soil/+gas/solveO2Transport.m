@@ -16,6 +16,10 @@ function [C_O2,C_O2_liq,f_aerobic,f_anaerobic,ledger]=solveO2Transport( ...
 % Editor: Jizixing Zhu; Date: 2026-09-14.
 % Change: 2026-09-14 Codex -- conserve phase-resolved oxygen storage and
 %   return applied consumption instead of clipping material negative states.
+% Change: 2026-10-05 Wenjie Liu -- retain successful active-set solutions
+%   exactly; if node-to-layer demand mapping produces a material negative,
+%   preserve feasible reserved respiration and conservatively limit only
+%   the remaining layer demand along its common nonnegative feasible ray.
     if nargin<12, bottom=[]; end
     C_old=C_old(:); Tnew=Tnew(:); dz=dz(:); requested=requested(:);
     porosity=porosity(:); velocity=velocity(:);
@@ -98,6 +102,11 @@ function [C_O2,C_O2_liq,f_aerobic,f_anaerobic,ledger]=solveO2Transport( ...
     scale=min(nodeScale(1:NL),nodeScale(2:NN));
     actual=reserved+scale.*extra;
     C_O2=fixedA\(fixedb-fixedB*actual);
+    feasibilityFallback=[];
+    if all(isfinite(C_O2))&&any(C_O2< -tolerance)
+        [C_O2,actual,scale,feasibilityFallback]=limitAdditionalDemand( ...
+            fixedA,fixedB,fixedb,reserved,extra,scale,passive,tolerance,C_O2);
+    end
     assert(all(isfinite(C_O2))&&all(C_O2>=-tolerance), ...
         'soil:gas:oxygenNegative','Applied oxygen demand produced a negative state.');
     % Roundoff-only correction remains visible in the final mass residual.
@@ -121,6 +130,62 @@ function [C_O2,C_O2_liq,f_aerobic,f_anaerobic,ledger]=solveO2Transport( ...
         'top_input_mol_cm2',boundaryMass(end),'bottom_input_mol_cm2',boundaryMass(1), ...
         'balance_residual_mol_cm2',balance,'active_set_iterations',iteration, ...
         'phase_new',struct('theta_liquid',liquid,'theta_gas',gasNew,'temperature_C',Tnew));
+    if ~isempty(feasibilityFallback)
+        ledger.feasibility_fallback=feasibilityFallback;
+    end
+end
+
+function [concentration,actual,scale,audit]=limitAdditionalDemand( ...
+        operator,layerToNode,boundaryRhs,reserved,extra,originalScale,passive,tolerance,failed)
+%LIMITADDITIONALDEMAND Feasible reserved stock plus a bounded extra-demand ray.
+% All concentrations are node mol/cm3 gas; layer sinks are mol/cm3 bulk/s.
+% The unchanged positive transport operator gives C(lambda)=passive-lambda*H,
+% H=A\(B*(originalScale.*extra)). Restricting lambda to [0,1] can only reduce
+% the original additional removal; reserved respiration remains exact.
+% The maximal feasible scalar along this already-limited demand direction is
+% min(passive_i/H_i) over H_i>0. This is not a global allocation optimum.
+% Re-solve with the actual layer removal so concentration and the mass ledger
+% use identical sinks. A bounded bisection is used only if roundoff at the
+% analytical boundary fails the original nonnegativity tolerance. The known
+% feasible zero-extra endpoint remains available; no concentration is clipped
+% here, and the original material-negative and mass-balance guards still run.
+% Editor: Wenjie Liu; Date: 2026-10-05.
+    response=operator\(layerToNode*(originalScale.*extra));
+    assert(all(isfinite(response))&&all(response>=-tolerance), ...
+        'soil:gas:oxygenFeasibilityOperator','Extra-demand response must retain the positive transport operator.');
+    positive=response>0;
+    assert(any(positive),'soil:gas:oxygenFeasibilityDirection', ...
+        'A negative mapped solution requires a finite additional-demand direction.');
+    analyticCap=max(0,min(1,min(max(passive(positive),0)./response(positive))));
+    lambda=analyticCap*(1-32*eps(1));
+    scale=originalScale*lambda;actual=reserved+scale.*extra;
+    concentration=operator\(boundaryRhs-layerToNode*actual);
+    solves=1;usedBisection=false;
+    if ~all(isfinite(concentration))||any(concentration< -tolerance)
+        usedBisection=true;lower=0;upper=lambda;
+        concentration=passive;actual=reserved;scale=zeros(size(originalScale));
+        for iteration=1:40
+            trialLambda=(lower+upper)/2;
+            trialScale=originalScale*trialLambda;
+            trialActual=reserved+trialScale.*extra;
+            trialConcentration=operator\(boundaryRhs-layerToNode*trialActual);
+            solves=solves+1;
+            if all(isfinite(trialConcentration))&&all(trialConcentration>=-tolerance)
+                lower=trialLambda;concentration=trialConcentration;
+                actual=trialActual;scale=trialScale;
+            else
+                upper=trialLambda;
+            end
+        end
+        lambda=lower;
+    end
+    assert(all(actual>=reserved)&&all(actual<=reserved+originalScale.*extra), ...
+        'soil:gas:oxygenFeasibilitySink','Fallback may reduce only nonreserved additional demand.');
+    audit=struct('method','common_extra_demand_feasible_ray', ...
+        'trigger_min_concentration_mol_cm3_gas',min(failed), ...
+        'reserved_preserved',true,'analytic_lambda_cap',analyticCap,'applied_lambda',lambda, ...
+        'linear_solves',solves,'roundoff_bisection_used',usedBisection, ...
+        'original_additional_scale',originalScale,'original_nonnegative_tolerance',tolerance);
 end
 
 function ratio=henryRatio(temperature)

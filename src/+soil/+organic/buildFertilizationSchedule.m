@@ -1,14 +1,18 @@
 function schedule = buildFertilizationSchedule(config, enabled)
-%BUILDFERTILIZATIONSCHEDULE Normalize native organic-fertilizer AOM events.
+%BUILDFERTILIZATIONSCHEDULE Normalize direct-manure and straw-AOM events.
 %
 %   Public carbon [kg C ha^-1] is converted to [g C cm^-2] with
 %   1 kg ha^-1 = 1e-5 g cm^-2. Event C:N initializes an independent nitrogen
-%   mass. Manure total N is separated into organic N and TAN; only organic N
-%   enters AOM, while TAN is staged to the existing COMPASS NH4 pool at the
-%   same placement depth. Material identity selects the native AOM store; no
-%   retired slow/fast/direct pool partition is accepted.
+%   mass. Total N is separated into organic N and TAN. Manure organic C/N
+%   enters MEND directly; straw organic C/N remains in the native AOM store.
+%   TAN is staged separately to the COMPASS NH4 owner at the same depth.
+%   Incorporated mass is uniform per unit depth over the exact event band.
+%   Legacy organic_mixing_efficiency is accepted only when every value is 1;
+%   non-unit values fail rather than silently retaining an 80/20 surface split.
 %   Editor: Codex; Date: 2026-08-29.
 %   Change: 2026-08-30 Codex -- add conservative manure organic-N/TAN split.
+%   Change: 2026-10-10 Wenjie Liu -- direct manure, straw AOM, and full-depth
+%     uniform placement; reject the retired partial-mixing contract.
     schedule = emptySchedule();
     if ~enabled || ~isfield(config, 'fertilization'), return; end
     f = config.fertilization;
@@ -69,9 +73,11 @@ function schedule = buildFertilizationSchedule(config, enabled)
         mixingEfficiency=eventRow(f.organic_mixing_efficiency,n, ...
             'organic_mixing_efficiency');
     end
-    if any(mixingEfficiency<0|mixingEfficiency>1)
+    if any(mixingEfficiency~=1)
         error('buildFertilizationSchedule:mixingEfficiency', ...
-            'organic_mixing_efficiency must be within [0,1].');
+            ['organic_mixing_efficiency must now equal 1 for every event. ', ...
+             'The retired partial-mixing/surface-remainder contract is not supported; ', ...
+             'use explicit surface or incorporated placement.']);
     end
     schedule=struct('n_events',n,'time',times(:).', ...
         'material_type',{cellstr(materialType(:)).'}, ...

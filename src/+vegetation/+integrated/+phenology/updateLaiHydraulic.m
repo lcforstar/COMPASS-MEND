@@ -30,21 +30,34 @@ function laiState = updateLaiHydraulic(laiState, dayIdx, wt, Tmax_d, Tmin_d, par
 %
 %   Reference: legacy VegetationData.m:748-831 (Method B); Williams 1989 EPIC LAI.
 %   Editor: Jizixing Zhu; Date: 2026-07-02.
+%   Change: 2026-09-30 Wenjie Liu -- annual crops use explicit planting and
+%   harvest state, no tree-age multiplier, autumn leaf-off, or January reset.
     if dayIdx < 1 || dayIdx > numel(driver.phen_CHU_model)
         return;   % outside the precomputed phenology window -> no update
     end
 
     % Year boundary: reset dormancy + decay state every 365 days (VegetationData.m:766-772)
+    isCrop = isfield(params,'is_crop') && params.is_crop;
     withinYearDay = mod(dayIdx - 1, 365) + 1;
-    if withinYearDay == 1 && dayIdx > 1
+    if isCrop && isfield(params,'calendar_doy'),withinYearDay=params.calendar_doy;end
+    if isCrop && params.crop_planting_event
+        laiState.lai_day_dormant = false;
+        laiState.lai_day_LAI_D = 0;
+        laiState.lai_day_HUI_D = params.DLAI;
+        laiState.lai_day_prev = 0;
+    elseif ~isCrop && withinYearDay == 1 && dayIdx > 1
         laiState.lai_day_dormant = false;
         laiState.lai_day_LAI_D   = 0;
         laiState.lai_day_HUI_D   = params.DLAI;
         laiState.lai_day_yr      = laiState.lai_day_yr + 1;
     end
 
-    yrActual = params.yr_cur + laiState.lai_day_yr;
-    XLAI     = min(yrActual / params.yr_full, 1) * params.LAI_max;
+    if isCrop
+        XLAI = params.LAI_max;
+    else
+        yrActual = params.yr_cur + laiState.lai_day_yr;
+        XLAI = min(yrActual / params.yr_full, 1) * params.LAI_max;
+    end
 
     % Temperature stress f_T (VegetationData.m:778-784)
     Tav = (Tmax_d + Tmin_d) / 2;
@@ -64,14 +77,17 @@ function laiState = updateLaiHydraulic(laiState, dayIdx, wt, Tmax_d, Tmin_d, par
     dHUF_d = driver.phen_dHUF_model(dayIdx);
 
     % Deciduous dormancy lock (irreversible within-year) (VegetationData.m:795-799)
-    if params.is_deciduous && ~laiState.lai_day_dormant
+    if ~isCrop && params.is_deciduous && ~laiState.lai_day_dormant
         if withinYearDay > 300 && (Tmin_d < 0 || withinYearDay >= 320)
             laiState.lai_day_dormant = true;
         end
     end
 
     % LAI state machine: dormancy -> pre-germination -> growth -> senescence
-    if laiState.lai_day_dormant
+    cropBare = isCrop && (~params.crop_live || params.crop_phase<2);
+    if cropBare
+        LAI_new = 0;
+    elseif laiState.lai_day_dormant
         LAI_new = params.ALAI_MIN;
     elseif CHU_d <= params.GMHU
         LAI_new = params.ALAI_MIN;
@@ -91,7 +107,7 @@ function laiState = updateLaiHydraulic(laiState, dayIdx, wt, Tmax_d, Tmin_d, par
         end
     end
 
-    LAI_new = max(params.ALAI_MIN, LAI_new);
+    if ~cropBare,LAI_new = max(params.ALAI_MIN, LAI_new);end
     if ~isfinite(LAI_new), LAI_new = laiState.lai_day_prev; end
 
     laiState.lai_day_prev      = LAI_new;

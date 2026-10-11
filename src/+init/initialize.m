@@ -36,6 +36,8 @@ function model = initialize(siteDir)
 % Change: 2026-07-11 Jizixing Zhu -- route field and laboratory sites through an explicit component input plan.
 % Change: 2026-07-18 Jizixing Zhu -- align an initial bottom temperature node with
 %         its same-time Dirichlet boundary and rebuild U-dependent auxiliaries.
+% Change: 2026-09-29 Wenjie Liu -- condition warm field water and total DIN
+%         with the actual accepted endpoint/control-volume initialization.
 
     config = io.loadSiteConfig(siteDir);
     plan = init.resolveSimulationPlan(config);
@@ -50,6 +52,8 @@ function model = initialize(siteDir)
     built  = init.allocateWorkspace(built);
     built  = init.initializeSoilAux(built);
     built  = init.alignInitialThermalBoundary(built);
+    [built,measuredAudit] = init.conditionMeasuredSoilInitialState(built,raw);
+    built.p.initialization.measured_soil=measuredAudit;
 
     model              = struct();
     model.siteDir      = raw.siteDir;

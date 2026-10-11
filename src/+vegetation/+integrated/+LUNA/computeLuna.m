@@ -52,6 +52,11 @@ function lunaOut = computeLuna(lunaIn, lunaState, p)
 %     Ali et al. 2016 GMD 9:587 — LUNA v1.0
 %
 %   Author: Zhu Jizixing 2026-05-20
+% Change: 2026-09-30 Wenjie Liu -- actual-leaf-N mode bounds all functional
+% investments after capacity rate limits; compatibility mode is unchanged.
+% Change: 2026-09-30 Wenjie Liu -- roll back this round's leaf-N LUNA
+%   extension to the frozen COMPASS implementation; historical records above
+%   are retained. Winter-wheat C/N allocation is handled separately.
 
     nrad = lunaIn.nrad;
 

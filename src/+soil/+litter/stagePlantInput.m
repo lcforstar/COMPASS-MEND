@@ -4,10 +4,12 @@ function result=stagePlantInput(organicAccepted,microbeAccepted,domAccepted, ...
 %
 %   Plant cumulative litter differences [g C/N m^-2] are converted to
 %   [g cm^-2]. Leaf litter enters the top element; root litter follows the
-%   configured beta depth distribution. The source-MEND type-1 partition sends
-%   its DOM fraction directly to the sole DOC/DON owner. The complementary
-%   fraction enters the native litter AOM front end, where winter-wheat PFT
-%   material quality remains authoritative. Nothing is committed here.
+%   configured beta depth distribution. CoLM-derived PlantCN determines the
+%   supplied C/N amounts; all returned plant material follows one configured
+%   MEND [POM1 POM2 DOC] carbon partition with conservative source-MEND N
+%   stoichiometry. This unified baseline includes any wood/pruning returns.
+%   Newly returned material does not enter the AOM decomposition front end.
+%   Existing AOM remains unchanged. Nothing is committed here.
 %
 %   Editor: Jizixing Zhu; Date: 2026-08-21.
 %   Change: 2026-08-24 Jizixing Zhu -- include pruning and split background
@@ -18,6 +20,8 @@ function result=stagePlantInput(organicAccepted,microbeAccepted,domAccepted, ...
 %   once into CoLM components; pruning and wood mortality enter CWD.
 % Change: 2026-09-13 Jizixing Zhu -- apply the source-MEND type-1 DOM
 %   fraction to accepted PlantCN litter while preserving AOM material quality.
+% Change: 2026-10-10 Wenjie Liu -- stage full CoLM plant C/N returns once
+%   into MEND POM1/POM2/total DOM; preserve supplied total N with input C:N.
     result=struct('organic',organicAccepted,'microbes',microbeAccepted, ...
         'dom',domAccepted,'carbon_added_g_cm2',0, ...
         'nitrogen_added_g_cm2',0,'aboveground_carbon_g_m2',0, ...
@@ -44,10 +48,6 @@ function result=stagePlantInput(organicAccepted,microbeAccepted,domAccepted, ...
     rootN=increment(plantCandidate,'cum_N_root_litter',a.cum_N_root_litter);
     rootN=rootN+mortalityRootN;
     if leafC+rootC+leafN+rootN<=0, return; end
-    assert(isfield(result.organic,'aom') ...
-        &&isfield(result.organic.aom,'litter'), ...
-        'stagePlantInput:missingNativeAom', ...
-        'Plant litter requires the native COMPASS litter AOM store.');
     dzTop=flip(built.domain.dz(:));
     cProfile=zeros(size(dzTop)); nProfile=zeros(size(dzTop));
     w=rootWeights(dzTop,built.parameters.litter);
@@ -63,45 +63,18 @@ function result=stagePlantInput(organicAccepted,microbeAccepted,domAccepted, ...
         'stagePlantInput:badMendInputFraction', ...
         'The source-MEND POM1/POM2/DOM input fractions must sum to one.');
     domFraction=inputFraction(3);
-    aomFraction=1-domFraction;
-    assert(isfield(result.dom,'doc_total_g_cm3') ...
-        &&isfield(result.dom,'don_total_g_cm3'), ...
-        'stagePlantInput:missingDomOwner', ...
-        'A nonzero source-MEND DOM input requires the sole DOC/DON owner.');
-    directDocTop=domFraction.*cProfile;
-    directDonTop=domFraction.*nProfile;
-    directDocTop(1)=directDocTop(1)+domFraction.*leafC./1e4./dzTop(1);
-    directDonTop(1)=directDonTop(1)+domFraction.*leafN./1e4./dzTop(1);
-    result.dom.doc_total_g_cm3=result.dom.doc_total_g_cm3+flip(directDocTop);
-    result.dom.don_total_g_cm3=result.dom.don_total_g_cm3+flip(directDonTop);
-    if isfield(result.organic.aom.litter,'components')
-        p=built.parameters.soil_organic.aom;
-        pool=soil.litter.componentTotals(result.organic.aom.litter,true);
-        woodC=mortalityAboveC+incrementOptional(plantCandidate,'cum_C_prune_litter',a);
-        woodN=mortalityAboveN+incrementOptional(plantCandidate,'cum_N_prune_litter',a);
-        names={'metabolic','cellulose','lignin','cwd'};
-        aboveC=aomFraction.*[p.litter_leaf_fractions(:).*(leafC-woodC);woodC]/1e4;
-        aboveN=aomFraction.*[p.litter_leaf_fractions(:).*(leafN-woodN);woodN]/1e4;
-        belowC=aomFraction.*[p.litter_root_fractions(:).*(rootC-mortalityRootC);mortalityRootC]/1e4;
-        belowN=aomFraction.*[p.litter_root_fractions(:).*(rootN-mortalityRootN);mortalityRootN]/1e4;
-        for j=1:4
-            b=pool.components.(names{j});
-            b.surface_C=b.surface_C+aboveC(j); b.surface_N=b.surface_N+aboveN(j);
-            b.element_C=b.element_C+flip(belowC(j).*w./dzTop);
-            b.element_N=b.element_N+flip(belowN(j).*w./dzTop);
-            pool.components.(names{j})=b;
-        end
-        result.organic.aom.litter=soil.litter.componentTotals(pool,false);
-    else
-    result.organic.aom.litter.surface_C = ...
-        result.organic.aom.litter.surface_C+aomFraction.*leafC/1e4;
-    result.organic.aom.litter.surface_N = ...
-        result.organic.aom.litter.surface_N+aomFraction.*leafN/1e4;
-    result.organic.aom.litter.element_C = ...
-        result.organic.aom.litter.element_C+flip(aomFraction.*cProfile);
-    result.organic.aom.litter.element_N = ...
-        result.organic.aom.litter.element_N+flip(aomFraction.*nProfile);
-    end
+    % Validate each source separately: an infeasible leaf C:N must not be
+    % hidden by pooling its N requirement with the root return in the top cell.
+    soil.mend.partitionExternalInput([leafC,rootC],[leafN,rootN], ...
+        inputFraction,built.parameters.soil_microbes.CN_POM2, ...
+        built.parameters.soil_microbes.input_cn_lignin_to_labile);
+    inputC=cProfile;inputN=nProfile;
+    inputC(1)=inputC(1)+leafC./1e4./dzTop(1);
+    inputN(1)=inputN(1)+leafN./1e4./dzTop(1);
+    [result.organic,result.microbes,result.dom,partition]= ...
+        soil.mend.stageExternalInput(result.organic,result.microbes,result.dom, ...
+        flip(inputC),flip(inputN),inputFraction,built.parameters.soil_microbes, ...
+        built.parameters.soil.bulk_density(:));
     result.carbon_added_g_cm2=leafC/1e4+sum(cProfile.*dzTop);
     result.nitrogen_added_g_cm2=leafN/1e4+sum(nProfile.*dzTop);
     result.organic.cumulative.input_C_g_cm2 = ...
@@ -116,14 +89,15 @@ function result=stagePlantInput(organicAccepted,microbeAccepted,domAccepted, ...
     result.belowground_carbon_g_m2=rootC;
     result.aboveground_nitrogen_g_m2=leafN;
     result.belowground_nitrogen_g_m2=rootN;
-    result.direct_doc_carbon_g_cm2=domFraction*result.carbon_added_g_cm2;
-    result.direct_don_nitrogen_g_cm2=domFraction*result.nitrogen_added_g_cm2;
+    dzBottom=built.domain.dz(:);
+    result.direct_doc_carbon_g_cm2=sum(partition.C_DOC.*dzBottom);
+    result.direct_don_nitrogen_g_cm2=sum(partition.N_DON.*dzBottom);
     result.mend_dom_input_fraction=domFraction;
-    aomCarbon=aomFraction*result.carbon_added_g_cm2;
-    aomNitrogen=aomFraction*result.nitrogen_added_g_cm2;
-    assert(abs(aomCarbon+result.direct_doc_carbon_g_cm2 ...
+    pomCarbon=sum((partition.C_POM1+partition.C_POM2).*dzBottom);
+    ponNitrogen=sum((partition.N_PON1+partition.N_PON2).*dzBottom);
+    assert(abs(pomCarbon+result.direct_doc_carbon_g_cm2 ...
         -result.carbon_added_g_cm2)<=1e-14*max(1,result.carbon_added_g_cm2) ...
-        &&abs(aomNitrogen+result.direct_don_nitrogen_g_cm2 ...
+        &&abs(ponNitrogen+result.direct_don_nitrogen_g_cm2 ...
         -result.nitrogen_added_g_cm2)<=1e-14*max(1,result.nitrogen_added_g_cm2), ...
         'stagePlantInput:mendInputClosure', ...
         'Source-MEND PlantCN input partition does not conserve C/N.');

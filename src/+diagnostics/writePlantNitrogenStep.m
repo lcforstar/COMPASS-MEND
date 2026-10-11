@@ -232,3 +232,9 @@ function value = fieldValue(container, name)
         'Accepted plant C/N field %s must be a finite real scalar.', name);
     value = double(container.(name));
 end
+
+% Change: 2026-09-30 Wenjie Liu -- export accepted annual standing-leaf
+% and WSC pools and transfers; include both pools in plant C/N closure.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

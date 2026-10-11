@@ -14,6 +14,13 @@ function [luna_state_next, buffer_struct_next] = runDailyLuna(model, kt, buffer)
 %   the buffer is warm. This function never pushes the buffer and is called
 %   only from the accepted outer-step commit path.
 %   Editor: Jizixing Zhu; Date: 2026-07-16.
+% Change: 2026-09-30 Wenjie Liu -- actual accepted green-leaf nitrogen,
+% astronomical daylength, annual season reset and functional-N bounds.
+% Incident RTMo PAR no longer divides by thermal-band emissivity in the
+% physical-leaf-N mode; the explicit compatibility mode retains its adapter.
+% Change: 2026-09-30 Wenjie Liu -- roll back this round's leaf-N LUNA
+%   extension to the frozen COMPASS implementation; historical records above
+%   are retained. Winter-wheat C/N allocation is handled separately.
     luna_state = model.built.Y.plant_acclimation.luna_state;
     luna_state_next = luna_state;
     buffer_struct_next = buffer.toStruct();

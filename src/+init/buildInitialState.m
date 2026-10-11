@@ -1,4 +1,6 @@
 function Y = buildInitialState(rawInit, built, cfg, bd, plan)
+% Change: 2026-09-30 Wenjie Liu -- selectively restore COMPASS canopy
+% behavior; retain winter-wheat phenology and CoLM C/N allocation.
 %BUILDINITIALSTATE  Interpolate initial conditions onto the grid (stage C).
 %
 %   Y = init.buildInitialState(rawInit, built, cfg, bd) reproduces the legacy
@@ -49,6 +51,9 @@ function Y = buildInitialState(rawInit, built, cfg, bd, plan)
 % Change: 2026-07-17 Jizixing Zhu -- replace scalar SWE with the conservative
 %   bulk-snow prognostic triplet SWE/liquid_water/energy.
 % Change: 2026-07-20 Jizixing Zhu -- allocate the detached accepted soil-N memory schema.
+% Change: 2026-09-29 Wenjie Liu -- document provisional water/DIN mapping:
+%   warm field facades finalize measured profiles after actual endpoint refresh
+%   in init.conditionMeasuredSoilInitialState; this builder is not that final roundtrip.
 
     domain = built.domain;
     soil   = built.parameters.soil;
@@ -191,7 +196,8 @@ function Y = buildInitialState(rawInit, built, cfg, bd, plan)
     if ~isfield(laiState0, 'wt_day_min'); laiState0.wt_day_min = 1.0; end   % [-] daily min(wt_sun,wt_sha), reset to 1 each day
     Y.vegetation = struct( ...
         'phenology', struct('state', vegetation.integrated.phenology.PhenologyState(), ...
-                            'year_mtemp_max', -999, 'year', 0, 'now', 0), ...
+                            'year_mtemp_max', -999, 'year', 0, 'now', 0, ...
+                            'last_advance_day_index', 0), ...
         'lai_state', laiState0);
 
     % plant-acclimation running state (moved from runtime.leaf_resp + runtime.luna 2026-07-05,

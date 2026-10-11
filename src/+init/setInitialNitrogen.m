@@ -346,3 +346,9 @@ function v = getInitVal(cfg, name, default)
         end
     end
 end
+
+% Change: 2026-09-30 Wenjie Liu -- keep the compatibility NSC diagnostic
+% template consistent with annual WSC and standing-senescence diagnostics.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

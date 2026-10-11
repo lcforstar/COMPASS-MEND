@@ -248,8 +248,31 @@ function model = applyResumeCheckpoint(model, ckpt)
             'beginRun:rootWaterHistory','Checkpoint root-water history shape/values are invalid.');
         model.built.workspace.flux.Srt=rootWater;
         model.runtime.resume.root_water_history='checkpoint_exact';
+        if isfield(memory,'surface_water_history')
+            history=memory.surface_water_history;
+            assert(isstruct(history)&&isscalar(history) ...
+                &&all(isfield(history,{'throughfall_cm_s','evap_cm_s'})), ...
+                'beginRun:surfaceWaterHistory','Invalid checkpoint surface-water history.');
+            for name={'throughfall_cm_s','evap_cm_s'}
+                value=history.(name{1});
+                assert(isnumeric(value)&&isscalar(value)&&isreal(value)&&isfinite(value), ...
+                    'beginRun:surfaceWaterHistory', ...
+                    'Checkpoint %s must be a finite real scalar [cm/s].',name{1});
+            end
+            % Change: 2026-09-30 Wenjie Liu -- hasAbruptWetting consumes
+            % these previous accepted rates before the current soil solve.
+            model.built.workspace.flux.Throughfall=history.throughfall_cm_s;
+            model.built.workspace.flux.EVAP=history.evap_cm_s;
+            model.runtime.resume.surface_water_history='checkpoint_exact';
+        else
+            model.runtime.resume.surface_water_history='legacy_missing_zero_seed_not_exact';
+            warning('beginRun:missingSurfaceWaterHistory', ...
+                ['Checkpoint lacks previous accepted surface-water fluxes; using zero. ', ...
+                 'Exact continuous/restart equivalence is not guaranteed.']);
+        end
     else
         model.runtime.resume.root_water_history='legacy_missing_zero_seed_not_exact';
+        model.runtime.resume.surface_water_history='legacy_missing_zero_seed_not_exact';
         warning('beginRun:missingRootWaterHistory', ...
             ['Checkpoint lacks previous accepted root-water history; using zero. ', ...
              'Exact continuous/restart equivalence is not guaranteed.']);
@@ -270,6 +293,28 @@ function model = applyResumeCheckpoint(model, ckpt)
     model.runtime.groundwater = rt.groundwater;
     if isfield(rt, 'management')          % fertilizer once-only state (older ckpts lack it)
         model.runtime.management = rt.management;
+    end
+
+    % Change: 2026-09-29 Wenjie Liu -- restore explicit replay seam history;
+    % ordinary checkpoints without this optional contract retain their path.
+    if isfield(rt,'biogeochemistry_cycle')
+        context=rt.biogeochemistry_cycle;
+        init.validateBiogeochemistryCycleContext(context,model.built,ckpt.kt);
+        assert(isequaln(context.identity,init.buildBiogeochemistryCycleIdentity(model)), ...
+            'beginRun:cycleIdentity','Checkpoint replay model/source/forcing identity differs.');
+        assert(context.forcing_cycle_steps==model.runtime.run_control.n_steps, ...
+            'beginRun:cycleWindow','Checkpoint replay window differs from the requested window.');
+        model.runtime.biogeochemistry_cycle=context;
+    end
+    if isfield(rt,'biogeochemistry_spinup_identity')
+        assert(isequaln(rt.biogeochemistry_spinup_identity, ...
+            init.buildBiogeochemistryCycleIdentity(model)), ...
+            'beginRun:spinupIdentity','Checkpoint spin-up model/source/forcing identity differs.');
+        assert(isfield(rt,'biogeochemistry_spinup_cycle_steps') ...
+            &&rt.biogeochemistry_spinup_cycle_steps==model.runtime.run_control.n_steps, ...
+            'beginRun:spinupWindow','Checkpoint spin-up window differs from the requested window.');
+        model.runtime.biogeochemistry_spinup_identity=rt.biogeochemistry_spinup_identity;
+        model.runtime.biogeochemistry_spinup_cycle_steps=rt.biogeochemistry_spinup_cycle_steps;
     end
 
     % --- resume point (runCOMPASS starts the loop at next_kt) ---

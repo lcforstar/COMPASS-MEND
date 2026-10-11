@@ -34,6 +34,18 @@ function [NitrogenVariables, SoilVariables, NitrogenFlux, NitrogenDiagnostics] =
 %   same physical step start; align DIN layer order and accepted gas products.
 % Change: 2026-09-14 Codex -- reserve feasible soil respiration, limit actual
 %   nitrification by remaining O2, and retain a conservative oxygen ledger.
+% Change: 2026-09-21 Wenjie Liu -- interpret raw upward-positive top/bottom
+%   solute fluxes as nonnegative inputs/losses in instantaneous and cumulative
+%   conservation ledgers without changing the ADE boundary equations.
+% Change: 2026-09-21 Wenjie Liu -- expose the final frozen ADE and exact
+%   urea/granule donor changes only when the passive fertilizer tracer is active.
+% Change: 2026-10-06 Wenjie Liu -- keep empirical NH4-N mineralization out
+%   of the carbon-respiration O2 interface. Without a coupled carbon flux,
+%   the simplified empirical mode reserves no organic-respiration demand;
+%   nitrification still consumes O2 and the native coupled C/N path is unchanged.
+% Change: 2026-10-10 Wenjie Liu -- cap nitrification by the same nodal NH4
+%   storage/source quadrature as the ADE; propagate actual rates to NO3/N2O,
+%   oxygen and allocation ledgers before the unchanged transport solve.
 
 if nargin < 10 || isempty(ExternalInputs)
     ExternalInputs = struct();
@@ -230,6 +242,7 @@ oxygenNitCap=inf(NL,1);
 
 CHK2 = inf(NN, 1);
 CHK3 = inf(NN, 1);
+frozenADE=[];
 for iter = 1:max_iter
     [NitrogenVariables.Retard, NitrogenFlux.RetardBAR] = soil.nitrogen.chemistry.calculateRetardationFactors( ...
         Theta_Solute_LL, NitrogenVariables.RHOKG, NitrogenVariables.Retard, NitrogenFlux.RetardBAR, NL);
@@ -261,7 +274,10 @@ for iter = 1:max_iter
     if ExternalInputs.organic_enabled
         organicCarbonRate = repmat(ExternalInputs.organic_co2_c_rate(:),1,2);
     else
-        organicCarbonRate = NitrogenVariables.Smin;
+        % Smin is [ug N cm^-3 bulk s^-1], not respiratory carbon. The
+        % empirical mode has no C:N/respiration closure: use the documented
+        % uncoupled-carbon contract rather than inventing a conversion.
+        organicCarbonRate = zeros(NL,2);
     end
     R_O2_sink_bc = soil.gas.calcO2Sink(NitrogenVariables.Snit, organicCarbonRate, NL);
     NitrogenVariables.R_O2_sink = R_O2_sink_bc;   % [diag 2026-05-16] expose to main loop for reg.write
@@ -331,22 +347,6 @@ for iter = 1:max_iter
         NitrogenDiagnostics.reaction_allocation.remaining_mg_g(:,1)+oxygenNUnmet;
     NitrogenDiagnostics.reaction_allocation.scale(:,1)= ...
         NitrogenDiagnostics.reaction_allocation.scale(:,1).*oxygenFactor;
-    oxygenConverged=oxygenConverged&&all(abs(NitrogenVariables.Snit(:)-oxygenSnitUsed(:)) ...
-        <=1e-5*max(1e-12,max(abs(NitrogenVariables.Snit(:)))));
-    NitrogenVariables.Snit_N2o=0.02*NitrogenVariables.Snit;
-    NitrogenFlux.Cvnit_N2o(KT)=DeltZ(:)'*mean(NitrogenVariables.Snit_N2o,2);
-    beforeNodalDenit=NitrogenVariables.Sden;
-    [NitrogenVariables.Sden,nodalCap]=soil.nitrogen.limitDenitrificationAtNodes( ...
-        beforeNodalDenit,.98*NitrogenVariables.Snit-NitrogenVariables.SinkS(:,:,2)+NitrogenVariables.SorgNO3, ...
-        SoilVariables.C_NO3,Theta_Solute_L,DeltZ,Delt_t);
-    nodalUnmet=mean(beforeNodalDenit-NitrogenVariables.Sden,2).*Delt_t./NitrogenVariables.RHO_bulk(:)*1e-3;
-    NitrogenDiagnostics.reaction_allocation.actual_mg_g(:,2)=NitrogenDiagnostics.reaction_allocation.actual_mg_g(:,2)-nodalUnmet;
-    NitrogenDiagnostics.reaction_allocation.unmet_mg_g(:,2)=NitrogenDiagnostics.reaction_allocation.unmet_mg_g(:,2)+nodalUnmet;
-    NitrogenDiagnostics.reaction_allocation.remaining_mg_g(:,2)=NitrogenDiagnostics.reaction_allocation.remaining_mg_g(:,2)+nodalUnmet;
-    NitrogenDiagnostics.reaction_allocation.scale(:,2)=NitrogenDiagnostics.reaction_allocation.scale(:,2).*nodalCap.element_scale;
-    NitrogenDiagnostics.nodal_denitrification=nodalCap;
-    NitrogenFlux.Cvdenit_N2o(KT)=0.11*DeltZ(:)'*mean(NitrogenVariables.Sden,2);
-    NitrogenFlux.Cvdenit_N2(KT)=0.89*DeltZ(:)'*mean(NitrogenVariables.Sden,2);
     NitrogenDiagnostics.reaction_inventory_basis='post_partition_post_event_step_start_bottom_up';
     [NitrogenVariables.Shys, NitrogenVariables.Vpore, NitrogenVariables.WFPS, DeltaUrea] = soil.nitrogen.chemistry.ureaHydrolysis( ...
         NitrogenVariables.Kurea, NL, SoilVariables.C_Urea, NitrogenVariables.Vpore, NitrogenVariables.WFPS, ...
@@ -373,9 +373,55 @@ for iter = 1:max_iter
         DeltaGranule = zeros(NN, 1);
     end
 
-    [NitrogenVariables, SoilVariables, NitrogenFlux] = soil.nitrogen.transport.solveTransportStep( ...
-        NitrogenVariables, SoilVariables, NitrogenFlux, NitrogenBoundary, AirVariables, ...
-        Theta_Solute_L, Theta_Solute_LL, cfg, PeCr, KT, Delt_t);
+    % All same-hour NH4 sources are now known. Limit only nitrification;
+    % root reservations and already staged organic exchanges remain exact.
+    beforeNodalNit=NitrogenVariables.Snit;
+    otherNH4=NitrogenVariables.Shys+NitrogenVariables.Smin ...
+        +NitrogenVariables.Sdis-NitrogenVariables.Svol-NitrogenVariables.SinkS(:,:,1);
+    [NitrogenVariables.Snit,nodalNitCap]=soil.nitrogen.limitNitrificationAtNodes( ...
+        beforeNodalNit,otherNH4,SoilVariables.C_NH4,Theta_Solute_L, ...
+        NitrogenVariables.RHOKG,DeltZ,Delt_t);
+    nodalNitUnmet=mean(beforeNodalNit-NitrogenVariables.Snit,2) ...
+        .*Delt_t./NitrogenVariables.RHO_bulk(:)*1e-3;
+    NitrogenDiagnostics.reaction_allocation.actual_mg_g(:,1)= ...
+        NitrogenDiagnostics.reaction_allocation.actual_mg_g(:,1)-nodalNitUnmet;
+    NitrogenDiagnostics.reaction_allocation.unmet_mg_g(:,1)= ...
+        NitrogenDiagnostics.reaction_allocation.unmet_mg_g(:,1)+nodalNitUnmet;
+    NitrogenDiagnostics.reaction_allocation.remaining_mg_g(:,1)= ...
+        NitrogenDiagnostics.reaction_allocation.remaining_mg_g(:,1)+nodalNitUnmet;
+    NitrogenDiagnostics.reaction_allocation.scale(:,1)= ...
+        NitrogenDiagnostics.reaction_allocation.scale(:,1).*nodalNitCap.element_scale;
+    NitrogenDiagnostics.nodal_nitrification=nodalNitCap;
+    oxygenConverged=oxygenConverged&&all(abs(NitrogenVariables.Snit(:)-oxygenSnitUsed(:)) ...
+        <=1e-5*max(1e-12,max(abs(NitrogenVariables.Snit(:)))));
+    NitrogenVariables.Snit_N2o=0.02*NitrogenVariables.Snit;
+    NitrogenFlux.Cvnit_N2o(KT)=DeltZ(:)'*mean(NitrogenVariables.Snit_N2o,2);
+
+    % The NO3 allowance must use the actual, newly capped NH4 oxidation.
+    beforeNodalDenit=NitrogenVariables.Sden;
+    [NitrogenVariables.Sden,nodalCap]=soil.nitrogen.limitDenitrificationAtNodes( ...
+        beforeNodalDenit,.98*NitrogenVariables.Snit-NitrogenVariables.SinkS(:,:,2)+NitrogenVariables.SorgNO3, ...
+        SoilVariables.C_NO3,Theta_Solute_L,DeltZ,Delt_t);
+    nodalUnmet=mean(beforeNodalDenit-NitrogenVariables.Sden,2).*Delt_t./NitrogenVariables.RHO_bulk(:)*1e-3;
+    NitrogenDiagnostics.reaction_allocation.actual_mg_g(:,2)=NitrogenDiagnostics.reaction_allocation.actual_mg_g(:,2)-nodalUnmet;
+    NitrogenDiagnostics.reaction_allocation.unmet_mg_g(:,2)=NitrogenDiagnostics.reaction_allocation.unmet_mg_g(:,2)+nodalUnmet;
+    NitrogenDiagnostics.reaction_allocation.remaining_mg_g(:,2)=NitrogenDiagnostics.reaction_allocation.remaining_mg_g(:,2)+nodalUnmet;
+    NitrogenDiagnostics.reaction_allocation.scale(:,2)=NitrogenDiagnostics.reaction_allocation.scale(:,2).*nodalCap.element_scale;
+    NitrogenDiagnostics.nodal_denitrification=nodalCap;
+    NitrogenFlux.Cvdenit_N2o(KT)=0.11*DeltZ(:)'*mean(NitrogenVariables.Sden,2);
+    NitrogenFlux.Cvdenit_N2(KT)=0.89*DeltZ(:)'*mean(NitrogenVariables.Sden,2);
+
+    if isfield(NitrogenVariables,'fertilizer_tracer_total_gross')
+        [NitrogenVariables, SoilVariables, NitrogenFlux,frozenADE] = ...
+            soil.nitrogen.transport.solveTransportStep( ...
+            NitrogenVariables, SoilVariables, NitrogenFlux, NitrogenBoundary, AirVariables, ...
+            Theta_Solute_L, Theta_Solute_LL, cfg, PeCr, KT, Delt_t);
+    else
+        [NitrogenVariables, SoilVariables, NitrogenFlux] = ...
+            soil.nitrogen.transport.solveTransportStep( ...
+            NitrogenVariables, SoilVariables, NitrogenFlux, NitrogenBoundary, AirVariables, ...
+            Theta_Solute_L, Theta_Solute_LL, cfg, PeCr, KT, Delt_t);
+    end
 
     SoilVariables.C_Urea_new = SoilVariables.C_Urea - DeltaUrea;
     % Retain small positive stocks: threshold deletion would lose nitrogen.
@@ -436,6 +482,11 @@ SoilVariables.Theta_LL_for_N_prev = Theta_Solute_LL;
 SoilVariables.Theta_II_for_N_prev = SoilVariables.Theta_II;
 
 NitrogenDiagnostics.iterations = iter;
+if ~isempty(frozenADE)
+    NitrogenDiagnostics.fertilizer_tracer_frozen_ade=frozenADE;
+    NitrogenDiagnostics.fertilizer_tracer_delta_urea=DeltaUrea;
+    NitrogenDiagnostics.fertilizer_tracer_delta_granule=DeltaGranule;
+end
 NitrogenDiagnostics.Theta_Solute_LL = Theta_Solute_LL;
 NitrogenDiagnostics.Theta_Solute_L = Theta_Solute_L;
 cvOrganicNO3 = DeltZ(:)' * ExternalInputs.organic_no3_rate(:);
@@ -446,10 +497,16 @@ NitrogenDiagnostics.organic_co2_c_rate = ExternalInputs.organic_co2_c_rate;
 NitrogenDiagnostics.cvOrganicNO3 = cvOrganicNO3;
 NitrogenDiagnostics.CHK2 = CHK2;
 NitrogenDiagnostics.CHK3 = CHK3;
+nh4Boundary=soil.nitrogen.boundaryFluxLedger( ...
+    NitrogenFlux.cvTop(KT),NitrogenFlux.cvBot(KT));
+no3Boundary=soil.nitrogen.boundaryFluxLedger( ...
+    NitrogenFlux.cvTop1(KT),NitrogenFlux.cvBot1(KT));
+NitrogenDiagnostics.boundary_nh4=nh4Boundary;
+NitrogenDiagnostics.boundary_no3=no3Boundary;
 % [2026-05-16] cvSnit 已是 NH4 100% 总消耗 (含 NO3+N2O 两条路径), Cvnit_N2o 是 cvSnit 子集, 不再独立计入 NH4 ledger
 NitrogenDiagnostics.Massbalance_absolute_error_nh4 = ...
     (NitrogenFlux.cvnh4(KT) - NitrogenFlux.cvnh4OLD(KT)) / Delt_t - ...
-    (NitrogenFlux.cvTop(KT) + NitrogenFlux.cvBot(KT) - NitrogenFlux.cvSnit(KT) + ...
+    (nh4Boundary.net_into_column - NitrogenFlux.cvSnit(KT) + ...
     NitrogenFlux.cvSmin(KT) - NitrogenFlux.cvSinkSnh4(KT) - ...
     NitrogenFlux.cvSvol(KT) + ExternalInputs.nh4_added / Delt_t);
 denom_nh4 = max(abs((NitrogenFlux.cvnh4(KT) - NitrogenFlux.cvnh4OLD(KT)) / Delt_t), ...
@@ -462,7 +519,7 @@ NitrogenDiagnostics.Massbalance_relative_error_nh4 = 100 * abs(NitrogenDiagnosti
 % [2026-05-16] NO3 in 是 0.98×cvSnit (硝化产物 98% 入 NO3, 2% → N2O 不入), 跟 G2 = 0.98×Snit ... 一致
 NitrogenDiagnostics.Massbalance_absolute_error_no3 = ...
     (NitrogenFlux.cvno3(KT) - NitrogenFlux.cvno3OLD(KT)) / Delt_t - ...
-    (NitrogenFlux.cvTop1(KT) + NitrogenFlux.cvBot1(KT) - NitrogenFlux.cvSinkSno3(KT) - ...
+    (no3Boundary.net_into_column - NitrogenFlux.cvSinkSno3(KT) - ...
     NitrogenFlux.cvSden(KT) + 0.98 * NitrogenFlux.cvSnit(KT) + cvOrganicNO3 + ...
     ExternalInputs.no3_added / Delt_t);
 denom_no3 = max(abs((NitrogenFlux.cvno3(KT) - NitrogenFlux.cvno3OLD(KT)) / Delt_t), ...
@@ -502,6 +559,17 @@ if ~isfield(NitrogenFlux, 'cum_nh4_in_mg_cm2')
 end
 % Depth-integrate urea hydrolysis source: Shys is [μg/(cm³·s), NL×nD]
 % Same trapezoidal rule the transport assemble uses (Smin / Snit ...) for unit consistency.
+directionalBoundaryFields={ ...
+    'cum_top_input_NH4','cum_top_loss_NH4', ...
+    'cum_bottom_input_NH4','cum_bottom_loss_NH4', ...
+    'cum_top_input_NO3','cum_top_loss_NO3', ...
+    'cum_bottom_input_NO3','cum_bottom_loss_NO3'};
+for boundaryFieldIndex=1:numel(directionalBoundaryFields)
+    boundaryField=directionalBoundaryFields{boundaryFieldIndex};
+    if ~isfield(NitrogenFlux,boundaryField)
+        NitrogenFlux.(boundaryField)=0;
+    end
+end
 Shys_avg_now = (NitrogenVariables.Shys(:,1) + NitrogenVariables.Shys(:,2)) * 0.5;
 cvShys_now   = DeltZ(:)' * Shys_avg_now;   % [μg/(cm²·s)]
 NitrogenFlux.cum_cvShys = NitrogenFlux.cum_cvShys + Delt_t * cvShys_now;
@@ -517,17 +585,37 @@ NitrogenFlux.cum_cvTop_NO3  = NitrogenFlux.cum_cvTop_NO3  + Delt_t * NitrogenFlu
 NitrogenFlux.cum_cvBot_NO3  = NitrogenFlux.cum_cvBot_NO3  + Delt_t * NitrogenFlux.cvBot1(KT);
 NitrogenFlux.cum_cvSinkSno3 = NitrogenFlux.cum_cvSinkSno3 + Delt_t * NitrogenFlux.cvSinkSno3(KT);
 NitrogenFlux.cum_cvSden     = NitrogenFlux.cum_cvSden     + Delt_t * NitrogenFlux.cvSden(KT);
-% [2026-05-16] NH4 ledger: +Top +Bot +Smin +Shys, −Snit −SinkSnh4 −Svol
+NitrogenFlux.cum_top_input_NH4=NitrogenFlux.cum_top_input_NH4 ...
+    +Delt_t*nh4Boundary.top_input;
+NitrogenFlux.cum_top_loss_NH4=NitrogenFlux.cum_top_loss_NH4 ...
+    +Delt_t*nh4Boundary.top_loss;
+NitrogenFlux.cum_bottom_input_NH4=NitrogenFlux.cum_bottom_input_NH4 ...
+    +Delt_t*nh4Boundary.bottom_input;
+NitrogenFlux.cum_bottom_loss_NH4=NitrogenFlux.cum_bottom_loss_NH4 ...
+    +Delt_t*nh4Boundary.bottom_loss;
+NitrogenFlux.cum_top_input_NO3=NitrogenFlux.cum_top_input_NO3 ...
+    +Delt_t*no3Boundary.top_input;
+NitrogenFlux.cum_top_loss_NO3=NitrogenFlux.cum_top_loss_NO3 ...
+    +Delt_t*no3Boundary.top_loss;
+NitrogenFlux.cum_bottom_input_NO3=NitrogenFlux.cum_bottom_input_NO3 ...
+    +Delt_t*no3Boundary.bottom_input;
+NitrogenFlux.cum_bottom_loss_NO3=NitrogenFlux.cum_bottom_loss_NO3 ...
+    +Delt_t*no3Boundary.bottom_loss;
+% NH4 ledger: boundary inputs + Smin + Shys; boundary losses + reaction sinks.
 % (Snit 已含 NO3+N2O 全部 NH4 消耗, Cvnit_N2o 是 Snit 子集不再独立)
 NitrogenFlux.cum_nh4_in_mg_cm2 = NitrogenFlux.cum_nh4_in_mg_cm2 + Delt_t * ( ...
-    NitrogenFlux.cvTop(KT) + NitrogenFlux.cvBot(KT) + NitrogenFlux.cvSmin(KT) + cvShys_now);
+    nh4Boundary.top_input + nh4Boundary.bottom_input ...
+    + NitrogenFlux.cvSmin(KT) + cvShys_now);
 NitrogenFlux.cum_nh4_out_mg_cm2 = NitrogenFlux.cum_nh4_out_mg_cm2 + Delt_t * ( ...
-    NitrogenFlux.cvSnit(KT) + NitrogenFlux.cvSinkSnh4(KT) + NitrogenFlux.cvSvol(KT));
-% [2026-05-16] NO3 ledger: +Top +Bot +0.98×Snit (硝化 98% 入 NO3, 2%→N2O 不入), −SinkSno3 −Sden
+    nh4Boundary.top_loss + nh4Boundary.bottom_loss ...
+    + NitrogenFlux.cvSnit(KT) + NitrogenFlux.cvSinkSnh4(KT) + NitrogenFlux.cvSvol(KT));
+% NO3 ledger: boundary inputs + 0.98*Snit; boundary losses + uptake + Sden.
 NitrogenFlux.cum_no3_in_mg_cm2 = NitrogenFlux.cum_no3_in_mg_cm2 + Delt_t * ( ...
-    NitrogenFlux.cvTop1(KT) + NitrogenFlux.cvBot1(KT) + 0.98 * NitrogenFlux.cvSnit(KT));
+    no3Boundary.top_input + no3Boundary.bottom_input ...
+    + 0.98 * NitrogenFlux.cvSnit(KT));
 NitrogenFlux.cum_no3_out_mg_cm2 = NitrogenFlux.cum_no3_out_mg_cm2 + Delt_t * ( ...
-    NitrogenFlux.cvSinkSno3(KT) + NitrogenFlux.cvSden(KT));
+    no3Boundary.top_loss + no3Boundary.bottom_loss ...
+    + NitrogenFlux.cvSinkSno3(KT) + NitrogenFlux.cvSden(KT));
 NitrogenFlux.cum_no3_in_mg_cm2 = NitrogenFlux.cum_no3_in_mg_cm2 + ...
     Delt_t * max(cvOrganicNO3,0);
 NitrogenFlux.cum_no3_out_mg_cm2 = NitrogenFlux.cum_no3_out_mg_cm2 + ...

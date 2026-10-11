@@ -6,6 +6,11 @@ classdef Climate10dBuffer < handle
 %     +core). Construct as vegetation.integrated.LUNA.Climate10dBuffer(...).
 %   Change: 2026-07-01 Jizixing Zhu -- add toStruct/fromStruct for checkpoint/resume
 %     (handle class serialized explicitly instead of relying on MATLAB save(handle)).
+% Change: 2026-09-30 Wenjie Liu -- consume actual green-leaf N in named
+% plant_pool mode; fixed PFT N is an explicit compatibility mode only.
+% Change: 2026-09-30 Wenjie Liu -- roll back this round's leaf-N LUNA
+%   extension to the frozen COMPASS implementation; historical records above
+%   are retained. Winter-wheat C/N allocation is handled separately.
 %
 %   Variable class: AUXILIARY (per compass-coding-standard §1).
 %     - 不是 prognostic state (可以从 KT-1 forcing 重新累加重建)

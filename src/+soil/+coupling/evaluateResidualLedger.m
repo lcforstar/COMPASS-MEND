@@ -1,4 +1,4 @@
-function result = evaluateResidualLedger(built, ctx)
+function result = evaluateResidualLedger(built, ctx, prepared)
 %EVALUATERESIDUALLEDGER Evaluate exact coupled residuals and ledgers once.
 %
 %   This function refreshes one detached candidate, assembles the water,
@@ -11,6 +11,17 @@ function result = evaluateResidualLedger(built, ctx)
 %   are deliberately retained in the merit but are not reinterpreted as
 %   boundary mass or energy input.
 %
+%   Optional PREPARED is an immediate, same-alpha coefficient-refresh pair:
+%     .schema_version = 1; .source_candidate = BUILT before that refresh;
+%     .candidate and .equations = its unmodified refresh outputs;
+%     .refresh_opts = the exact options used by that refresh.
+%   This local handoff skips only the duplicate constitutive refresh. It is
+%   not a cache: parameters, grid, switches and forcing must remain frozen
+%   in the caller, and the pair must not cross a trial/retry or parameter
+%   rebuild. Trial coordinates, accepted soil anchors, phase input seeds and
+%   refresh options are checked below. All assembly, physical admissibility,
+%   boundary reactions and conservation ledgers are still evaluated here.
+%
 %   Editor: Jizixing Zhu; Date: 2026-08-14.
 %   Change: 2026-08-15 Jizixing Zhu -- make this the unique candidate-state
 %           owner for soil ledgers, physical admissibility, and the exact
@@ -18,12 +29,19 @@ function result = evaluateResidualLedger(built, ctx)
 %   Change: 2026-08-15 Jizixing Zhu -- return the exact dry-air and energy
 %           boundary fluxes used by their ledgers so outer accumulation
 %           cannot fall back to the preceding frozen Picard map.
+%   Change: 2026-10-07 Wenjie Liu -- accept an explicitly owned same-alpha
+%           refresh pair without repeating its constitutive calculation;
+%           retain the default interface and every exact acceptance ledger.
 
     validateContext(ctx);
     before = fingerprint(built);
-    cand = built;
-    [cand, equationBank] = soil.refreshSoilCoefficients( ...
-        cand, ctx.refresh_opts);
+    if nargin < 3 || isempty(prepared)
+        cand = built;
+        [cand, equationBank] = soil.refreshSoilCoefficients( ...
+            cand, ctx.refresh_opts);
+    else
+        [cand, equationBank] = readPreparedCandidate(built, ctx, prepared);
+    end
     assert(isfield(equationBank, 'flux_family') ...
             && equationBank.flux_family.schema_version == 1, ...
         'evaluateResidualLedger:missingSharedFluxFamily', ...
@@ -124,6 +142,69 @@ function result = evaluateResidualLedger(built, ctx)
     assert(result.caller_unchanged, ...
         'evaluateResidualLedger:callerMutated', ...
         'Detached exact evaluation mutated the caller model.');
+end
+
+function [cand, equationBank] = readPreparedCandidate(built, ctx, prepared)
+% Consume an immediate local refresh pair, never a cross-state cache entry.
+% The solver freezes static configuration inside the alpha loop. This check
+% therefore visits only bounded soil-state/seed arrays, not full parameters,
+% accepted ecosystem state, or multi-year forcing/diagnostic trees.
+% Editor: Wenjie Liu; Date: 2026-10-07.
+    required = {'schema_version','source_candidate','candidate', ...
+        'equations','refresh_opts'};
+    assert(isstruct(prepared) && isscalar(prepared) ...
+            && all(isfield(prepared, required)) ...
+            && isequal(prepared.schema_version, 1), ...
+        'evaluateResidualLedger:badPreparedCandidate', ...
+        'A complete immediate same-alpha refresh pair is required.');
+    assert(isequaln(prepared.refresh_opts, ctx.refresh_opts) ...
+            && isequaln(refreshSourceState(prepared.source_candidate), ...
+                refreshSourceState(built)), ...
+        'evaluateResidualLedger:stalePreparedCandidate', ...
+        'The refresh pair does not belong to this trial, anchors, seeds or options.');
+    cand = prepared.candidate;
+    equationBank = prepared.equations;
+    assert(isequaln(primaryTrialState(cand), primaryTrialState(built)) ...
+            && isequaln(acceptedSoilAnchors(cand), acceptedSoilAnchors(built)), ...
+        'evaluateResidualLedger:changedPreparedState', ...
+        'Constitutive refresh must preserve primary trial and accepted soil state.');
+end
+
+function state = refreshSourceState(built)
+% Retain the bounded dynamic inputs read by the production refresh chain.
+% Static configuration is owned/frozen by the immediate alpha-loop caller.
+% Editor: Wenjie Liu; Date: 2026-10-07.
+    state = struct('trial', built.workspace.step.trial, ...
+        'accepted', acceptedSoilAnchors(built));
+    d = built.workspace.derived;
+    seeds = {'EHCAP','c_unsat','Lambda_eff','TT_CRIT', ...
+        'DhFrezDh','DhFrezDT','Theta_II'};
+    state.seeds = selectedFields(d, seeds);
+    state.root_sink = built.workspace.flux.Srt;
+    state.step = selectedFields(built.workspace.step, {'L_f','trial_aux'});
+end
+
+function state = acceptedSoilAnchors(built)
+% Bound identity to the accepted water/thermal/gas time-layer inputs only.
+% Editor: Wenjie Liu; Date: 2026-10-07.
+    state = selectedFields(built.Y, {'h','T','U','p_gas','Theta_L','Theta_I'});
+end
+
+function state = primaryTrialState(built)
+% Freezing-head mirrors are refreshed; prognostic coordinates are unchanged.
+% Editor: Wenjie Liu; Date: 2026-10-07.
+    state = selectedFields(built.workspace.step.trial, {'h','T','U','p_gas'});
+end
+
+function out = selectedFields(in, names)
+% Copy a fixed, bounded field set without traversing unrelated run services.
+% Editor: Wenjie Liu; Date: 2026-10-07.
+    out = struct();
+    for i = 1:numel(names)
+        if isfield(in, names{i})
+            out.(names{i}) = in.(names{i});
+        end
+    end
 end
 
 function linearization = buildPrimaryLinearization(eq, rows, dz, ctx)

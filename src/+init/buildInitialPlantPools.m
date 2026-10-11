@@ -140,3 +140,9 @@ end
 
 % Change: 2026-09-02 Jizixing Zhu -- initialize the explicit xsmr debt-
 % writeoff ledger used by crop harvest without treating debt as atmospheric C.
+
+% Change: 2026-09-30 Wenjie Liu -- initialize explicit annual standing-leaf
+% C/N and stem WSC inventories and event memory only for enabled crop physiology.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

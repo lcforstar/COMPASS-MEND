@@ -2471,6 +2471,14 @@ PFTs(25).CN_dw                  = 500.0;
 PFTs(25).flivewd                = 1.0;
 PFTs(25).lwtop                  = 0.7;
 PFTs(25).CN_target_fruit        = 50.0;   % [g C g-1 N] supplied graincn
+% Change: 2026-09-30 Wenjie Liu -- explicit winter-wheat grain-fill donor
+% C:N limits, CoLM-SYSU/CoLM commit 626347a9156ab97db4ca846f47cd1b7f2728f705,
+% MOD_Const_PFT.F90 winter-wheat index 21 (fleafcn/fstemcn/ffrootcn).
+% These are reference defaults, not Changwu-fitted measurements. The actual-N
+% one-way adapter cannot export N from a root already below C/40.
+PFTs(25).CN_leaf_grainfill      = 65.0;
+PFTs(25).CN_stem_grainfill      = 100.0;
+PFTs(25).CN_root_grainfill      = 40.0;
 %   [LEGACY FALLBACK ALLOCATION]
 % The active winter-wheat path uses the CoLM HUI-dependent coefficients below.
 PFTs(25).f_alloc_leaf           = 0.45;
@@ -2492,26 +2500,34 @@ PFTs(25).Km_LATS_NO3            = 70;
 PFTs(25).leaf_long_days         = 365;
 PFTs(25).retransl_fraction      = 0.4;
 PFTs(25).r_m10                  = 0.066;   % legacy fallback; active crop path uses CLM br/Q10 below
-PFTs(25).R_g_fraction           = 0.25;    % [-] CLM5 crop allocation (g1), growth respiration
+PFTs(25).R_g_fraction           = 0.25;    % [-] LPJ/Sitch fraction of substrate after maintenance; not CoLM grperc
 PFTs(25).clm_crop_respiration   = 1;       % [0/1] use CLM5/CoLM crop maintenance respiration
 PFTs(25).clm_br_s               = 2.525e-6;% [g C gN-1 s-1] Ryan 1991 conversion used by CLM5/CoLM
 PFTs(25).clm_br_root_s          = 2.525e-6;% [g C gN-1 s-1] CLM5/CoLM belowground base rate
 PFTs(25).clm_resp_Q10           = 1.5;     % [-] CLM5/CoLM maintenance-respiration temperature factor
-PFTs(25).resp_scheme            = 0;       % CLM5/CoLM cpool-xsmrpool; not a crop calibration selector
+PFTs(25).resp_scheme            = 0;       % potential Rm unchanged; winter_wheat_cn enforces physical NSC funding
+% Change: 2026-09-30 Wenjie Liu -- clarify that this is the potential
+% respiration scheme, not permission to create a signed crop carbon debt.
 PFTs(25).xsmr_recovery_days     = 30.0;    % [d] CLM5/CoLM deficit recovery timescale
 PFTs(25).harvest_fraction       = 0.90;
 PFTs(25).root_turnover_rate     = 0.00274;
 PFTs(25).spring_release_days    = 60;
-%   [ACTIVE CoLM/CLM5 WINTER-CROP PARAMETERS]
-PFTs(25).arooti                 = 0.20;
+%   [ACTIVE LOCAL CoLM WINTER-CROP PARAMETERS]
+% Change: 2026-09-30 Wenjie Liu -- use the verified local CoLM
+% MOD_Const_PFT.F90 winter_wheat index 21 reference defaults (CROP enabled),
+% identical to commit 626347a9156ab97db4ca846f47cd1b7f2728f705.
+% Source declarations: arooti L1376, fleafi L1406, bfact L1421,
+% grnfill L1330, mxmat L1315. These are model reference values, not
+% Changwu measurements; observed_lai_zero still owns physical harvest.
+PFTs(25).arooti                 = 0.10;
 PFTs(25).arootf                 = 0.00;
 PFTs(25).astemf                 = 0.05;
 PFTs(25).allconss               = 1.00;
-PFTs(25).bfact                  = -10.0;
-PFTs(25).fleafi                 = 0.80;
+PFTs(25).bfact                  = 0.10;
+PFTs(25).fleafi                 = 0.90;
 PFTs(25).lfemerg                = 0.03;
-PFTs(25).grnfill                = 0.40;
-PFTs(25).mxmat                  = 330;
+PFTs(25).grnfill                = 0.67;
+PFTs(25).mxmat                  = 270;
 PFTs(25).min_NH_planting_date   = 901;
 PFTs(25).max_NH_planting_date   = 1130;
 PFTs(25).min_SH_planting_date   = 301;

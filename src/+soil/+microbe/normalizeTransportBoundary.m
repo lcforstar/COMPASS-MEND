@@ -1,0 +1,39 @@
+function spec=normalizeTransportBoundary(boundary)
+%NORMALIZETRANSPORTBOUNDARY Site-wide boundary for suspended cell particles.
+% Closed is the legacy default. advective_outflow requires free drainage and
+% explicit liquid_only (zero bottom vapor). No input concentration is guessed.
+% Adsorbed/retained phases have no external flux. The same transport clock is
+% used for all mobile C/N and intracellular-enzyme cargo under the open mode.
+% Editor: Wenjie Liu; Date: 2026-09-29.
+    assert(isstruct(boundary)&&isscalar(boundary),'bioparticle:boundaryConfig', ...
+        'Particle boundary must be a scalar struct.');
+    % Change: 2026-09-29 Wenjie Liu -- numbered particle boundary interface.
+    numbered={'bioparticle_top','bioparticle_bottom','bioparticle_top_carbon_mg_L', ...
+        'bioparticle_top_nitrogen_mg_L','bioparticle_bottom_carbon_mg_L','bioparticle_bottom_nitrogen_mg_L'};
+    if any(isfield(boundary,numbered))
+        spec=soil.dom.normalizeColumnBoundary(boundary,{'bioparticle'},true);return
+    end
+    keys=fieldnames(boundary);keys=keys(startsWith(keys,'bioparticle_'));
+    assert(isempty(setdiff(keys,{'bioparticle_bottom_kind','bioparticle_bottom_water_phase'})), ...
+        'bioparticle:boundaryConfig','Unknown [boundary] bioparticle_* field.');
+    kind='closed';phase='none';
+    if isfield(boundary,'bioparticle_bottom_kind'),kind=char(string(boundary.bioparticle_bottom_kind));end
+    if isfield(boundary,'bioparticle_bottom_water_phase'),phase=char(string(boundary.bioparticle_bottom_water_phase));end
+    assert(ismember(kind,{'closed','advective_outflow'}),'bioparticle:boundaryConfig', ...
+        'bioparticle_bottom_kind must be closed or advective_outflow.');
+    if strcmp(kind,'advective_outflow')
+        assert(strcmp(phase,'liquid_only')&&isfield(boundary,'water_bottom_kind') ...
+            &&strcmp(boundary.water_bottom_kind,'free_drainage'), ...
+            'bioparticle:boundaryWaterPolicy', ...
+            'Particle outflow requires free_drainage and explicit liquid_only water phase.');
+    else
+        assert(ismember(phase,{'none','liquid_only'}),'bioparticle:boundaryWaterPolicy', ...
+            'Unsupported particle bottom water phase.');
+        phase='none';
+    end
+    spec=struct('schema_version',1,'bottom_kind',kind,'water_phase',phase, ...
+        'top_kind','closed','external_diffusive_flux','zero', ...
+        'reverse_flow_policy','error_requires_external_concentration', ...
+        'advected_concentration','mobile_g_cm3_bulk_divided_by_theta_liquid', ...
+        'open_time_policy','common_mobile_C_N_ENZN_monotone_clock_v1','ledger_version',1);
+end

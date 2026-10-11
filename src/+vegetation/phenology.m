@@ -19,7 +19,7 @@ classdef phenology
     methods (Static)
         % ==================================================================
         function [CHU_record, HU, HUI_record, DRDS_list, RDS_list, HUF, dHUF] = ...
-                CalculateHeatUnit(Tmax, Tmin, sowing_day, T_b, PHU, FRGW1, LAIMX1, FRGW2, LAIMX2)
+                CalculateHeatUnit(Tmax, Tmin, sowing_day, T_b, PHU, FRGW1, LAIMX1, FRGW2, LAIMX2, clockDates)
             % CalculateHeatUnit  逐日累积热量单位 + frLAImx 曲线
             %
             % 输入：
@@ -45,6 +45,14 @@ classdef phenology
 
             if length(Tmax) ~= length(Tmin)
                 error('Plant:phenology:DimMismatch', 'Tmax 和 Tmin 长度必须相同');
+            end
+            % Change: 2026-09-30 Wenjie Liu -- optional explicit calendar
+            % drives recurring winter-crop seasons; legacy calls unchanged.
+            if nargin>=10 && ~isempty(clockDates)
+                [CHU_record,HU,HUI_record,DRDS_list,RDS_list,HUF,dHUF] = ...
+                    vegetation.integrated.phenology.cropHeatUnits( ...
+                    Tmax,Tmin,clockDates,sowing_day,T_b,PHU,FRGW1,LAIMX1,FRGW2,LAIMX2);
+                return;
             end
 
             % 由两控制点反算 l1, l2（Eq.6 逆推）

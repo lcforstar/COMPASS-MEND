@@ -44,6 +44,8 @@
 %   Change: 2026-07-17 Jizixing Zhu -- document Soil_bare, the replaceable
 %     accepted-snow seed, and current-step SCOPE surface ownership.
 
+% Change: 2026-09-29 Wenjie Liu -- explicit BGC replay context preserves
+% accepted skin-temperature memory at the forcing-cycle seam only.
     validateScopeModel(model, kt);
 
     built = model.built;
@@ -53,7 +55,9 @@
 
     scopeStatic = built.p.scope_static;   % static optics cache used by RTMo/RTMt/ebal
     step = struct();
-    step.Soil_bare = buildStepSoil(built, scope, kt, scopeStatic);
+    carryAtCycleStart=isfield(rt,'biogeochemistry_cycle') ...
+        &&rt.biogeochemistry_cycle.active;
+    step.Soil_bare = buildStepSoil(built, scope, kt, scopeStatic,carryAtCycleStart);
     step.Soil    = step.Soil_bare;
     step.Soil    = surface.snow.applySurfaceProperties( ...
         step.Soil, built.Y.snow, built.parameters.snow, scopeStatic.spectral);
@@ -94,7 +98,7 @@ function validateScopeModel(model, kt)
 end
 
 % -------------------------------------------------------------------------
-function Soil = buildStepSoil(built, scope, kt, scopeStatic)
+function Soil = buildStepSoil(built, scope, kt, scopeStatic,carryAtCycleStart)
 % Build the per-step SCOPE Soil struct from current state and soil baselines.
 % Editor: Jizixing Zhu; Date: 2026-06-28.
 % Change: 2026-07-03 Jizixing Zhu -- add Soil.refl for RTMo: static optical band plus per-step moisture-corrected thermal band; ports COMPASS.m:868-888.
@@ -116,7 +120,7 @@ function Soil = buildStepSoil(built, scope, kt, scopeStatic)
     % Soil.Ts [degC, 2x1]: sunlit/shaded soil skin temperature consumed by RTMt/ebal.
     % Legacy COMPASS.m:889-893 cold-starts kt=1 from meteo.Ta, then carries the
     % previous accepted ebal thermal.Ts into kt>1. RTMo does not read this field.
-    Soil.Ts            = previousAcceptedSurfaceTs(built, kt);
+    Soil.Ts            = previousAcceptedSurfaceTs(built, kt,carryAtCycleStart);
 
     if options.soil_heat_method == 1
         Soil.GAM = dynamicSoilThermalInertia(built);
@@ -199,11 +203,12 @@ end
 
 
 % -------------------------------------------------------------------------
-function Ts = previousAcceptedSurfaceTs(built, kt)
+function Ts = previousAcceptedSurfaceTs(built, kt,carryAtCycleStart)
 % Return the SCOPE/ebal soil skin-temperature carry for this step.
 % Editor: Jizixing Zhu; Date: 2026-07-08.
     Ts = [];
-    if kt > 1 && isfield(built.Y, 'surface') && isfield(built.Y.surface, 'Ts')
+    if (kt > 1 || carryAtCycleStart) ...
+            && isfield(built.Y, 'surface') && isfield(built.Y.surface, 'Ts')
         Ts0 = built.Y.surface.Ts;
         if isnumeric(Ts0) && numel(Ts0) == 2 && all(isfinite(Ts0(:)))
             Ts = Ts0(:);
@@ -234,6 +239,11 @@ function leafbio = buildStepLeafBio(built, scope, veg)
 %
 %   Editor: Jizixing Zhu; Date: 2026-07-08.
 %   Change: 2026-07-20 Jizixing Zhu — pass optional heat_gs_* params from veg.photosynthesis to leafbio (default off).
+% Change: 2026-09-30 Wenjie Liu -- consume compiled leaf physiology when
+% PlantCN is active; final actual-green-N bounds are staged after final LAI.
+% Change: 2026-09-30 Wenjie Liu -- roll back this round's leaf-N LUNA
+%   extension to the frozen COMPASS implementation; historical records above
+%   are retained. Winter-wheat C/N allocation is handled separately.
     lo = scope.leaf_optical;
     ps = veg.photosynthesis;
     leafbio = lo;

@@ -25,6 +25,11 @@ function pa = buildPlantAcclimationConfig(built)
 %   Reference: Ali et al. 2016 GMD 9:587 (LUNA 10-day mean climate driver);
 %   Atkin et al. 2015 New Phytol 206:614 (leaf Rd25 growth-T acclimation).
 %   Editor: Jizixing Zhu; Date: 2026-07-05.
+% Change: 2026-09-30 Wenjie Liu -- make leaf-N source and coupled annual
+% crop applicability explicit; fixed PFT nitrogen is a compatibility mode.
+% Change: 2026-09-30 Wenjie Liu -- roll back this round's leaf-N LUNA
+%   extension to the frozen COMPASS implementation; historical records above
+%   are retained. Winter-wheat C/N allocation is handled separately.
     dt = built.control.time.Delt_t;
     stepsPerDay = max(1, round(86400 / dt));
 

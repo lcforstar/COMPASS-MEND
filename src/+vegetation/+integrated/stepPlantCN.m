@@ -31,6 +31,8 @@ function [plantCnNext, neeOut, dbg] = stepPlantCN( ...
 % Change: 2026-07-11 Jizixing Zhu -- remove root water/N uptake ownership; consume independent U_N_total only.
 % Change: 2026-08-21 Jizixing Zhu -- tolerate sites whose non-crop phenology
 %   driver has no phen_HUI field when live litter coupling enables PlantCN.
+% Change: 2026-09-30 Wenjie Liu -- retain the immutable accepted PlantCN
+% input and frozen forcing for winter-wheat replay with actual soil N uptake.
 
     if nargin < 5 || isempty(demandContext), demandContext = struct(); end
     if nargin < 6 || isempty(rootNitrogenResult)
@@ -59,15 +61,26 @@ function [plantCnNext, neeOut, dbg] = stepPlantCN( ...
             'stepPlantCN:missingDemandContext', ...
             'PlantCN with soil nitrogen enabled requires prepared plant N demand.');
         demandCtx = demandContext.demand_ctx;
+        acceptedNV = NV;
         U_N_total = getField(rootNitrogenResult, 'U_N_total', 0);
         NV.cum_U_N = NV.cum_U_N + U_N_total * Delt_t;
 
         envTurn = buildEnvTurn(built, phenNext, canopy, curDate, kt, Delt_t);
         [NV, R_a_plant_kg] = vegetation.integrated.runPlantCNStep( ...
             NV, demandCtx, U_N_total, envTurn, Delt_t, 2);
-        neeOut = computeNeeFull(built, kt, fluxes, NV, Delt_t);
+        % The final AOM/MEND CO2 and root-N reconciliation are downstream.
+        % Exchange is materialized from final owner increments in runOneStep.
+        % Change: 2026-09-30 Wenjie Liu -- retire empirical soil Rh from PlantCN.
+        neeOut = [];
         dbg = struct('demand_ctx', demandCtx, 'U_N_total', U_N_total, ...
             'R_a_plant_kg', R_a_plant_kg, 'env_turn', envTurn);
+        if demandCtx.plant_cn_params.resolved.winter_wheat_cn == 1
+            % Ephemeral request material: this is not a second accepted
+            % physical state and is never installed in Y or checkpoints.
+            dbg.plant_cn_replay = struct('schema_version',1, ...
+                'accepted_nv',acceptedNV,'demand_ctx',demandCtx, ...
+                'env_turn',envTurn,'dt_s',Delt_t);
+        end
     elseif isfield(fluxes, 'GPP')
         R_h = 0;
         if isfield(fluxes, 'Resp'), R_h = fluxes.Resp * 12 / 1e9; end
@@ -101,22 +114,6 @@ function envTurn = buildEnvTurn(built, phenNext, canopy, curDate, kt, Delt_t)
         'DLAI', veg.phenology.DLAI, ...
         'use_leafc_sla', strcmpi(veg.canopy.LAI_engine, 'leafc_sla_phen'), ...
         'year', year(curDate));
-end
-
-% -------------------------------------------------------------------------
-function neeOut = computeNeeFull(built, kt, fluxes, NV, Delt_t)
-% Compute NEE from soil heterotrophic respiration, plant respiration, and GPP.
-% Editor: Jizixing Zhu; Date: 2026-07-04.
-% Change: 2026-07-11 Jizixing Zhu -- keep NEE in PlantCN after root-uptake separation.
-    neeOut = [];
-    if ~isfield(fluxes, 'GPP'), return; end
-    hourly = built.forcing.hourly;
-    firstIndex = max(1, kt - 719);
-    precip30 = sum(hourly.Precip(firstIndex:kt)) * Delt_t;
-    R_h = equations.soil_respiration(hourly.Ta(kt), precip30);
-    R_a = NV.nsc_diag(2).R_a_actual_kg;
-    [nee, ~] = vegetation.integrated.computeNEE(fluxes.GPP, R_h, R_a);
-    neeOut = struct('NEE', nee, 'Resp', R_h * 1e9 / 12);
 end
 
 % -------------------------------------------------------------------------

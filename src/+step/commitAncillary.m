@@ -33,6 +33,13 @@ function model = commitAncillary(model, ledger, ancillary, kt)
     if ~isempty(carbon.Resp)
         model.built.workspace.scope_step.fluxes.Resp = carbon.Resp;
     end
+    carbonFields = {'GPP','Ra_plant','Rh_aom','Rh_mend','Rh','Reco'};
+    for j=1:numel(carbonFields)
+        key=carbonFields{j};
+        if isfield(carbon,key) && ~isempty(carbon.(key))
+            model.built.workspace.scope_step.fluxes.(key)=carbon.(key);
+        end
+    end
     if ~isempty(ancillary.diagnostics.v2_hydraulic)
         model.built.diagnostics.v2_hydraulic = ancillary.diagnostics.v2_hydraulic;
     end

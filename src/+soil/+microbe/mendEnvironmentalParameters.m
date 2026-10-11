@@ -6,38 +6,75 @@ function p = mendEnvironmentalParameters(base, temperatureC, swpMPa, pH)
 % (`iKinetics=0`) path from MOD_MEND.F90 commit 92323c7.
 %
 % Editor: Jizixing Zhu; Date: 2026-09-12.
+% Change: 2026-09-21 Wenjie Liu -- make the configured dormancy switch gate
+%   dormant maintenance and active/dormant exchange in both MEND solvers.
+% Change: 2026-09-29 Wenjie Liu -- accept top-down NL-by-1 kinetic profiles
+%   (NL-by-2 for POM pairs), with scalar legacy expansion at this adapter.
     temperatureC=temperatureC(:); swpMPa=swpMPa(:); pH=pH(:);
     assert(isequal(size(temperatureC),size(swpMPa),size(pH)) ...
         &&all(isfinite([temperatureC;swpMPa;pH]))&&all(pH>0), ...
         'soil:microbe:mendEnvironment','Invalid MEND environmental drivers.');
     n=numel(temperatureC);
+    dormancyEnabled=true;
+    if isfield(base,'dormancy_enabled')
+        flag=base.dormancy_enabled;
+        assert(isscalar(flag)&&(islogical(flag) ...
+            ||(isnumeric(flag)&&isreal(flag)&&isfinite(flag) ...
+            &&ismember(flag,[0 1]))), ...
+            'soil:microbe:mendDormancySwitch', ...
+            'dormancy_enabled must be a scalar logical or zero/one flag.');
+        dormancyEnabled=logical(flag);
+    end
     p=base;
-    p.VdPOM_h=[base.VdPOM_ref_h(1).*arrhenius(temperatureC,53.0) ...
+    vd=pairProfile(base.VdPOM_ref_h,n);ks=pairProfile(base.KsPOM_ref_mg_g,n);
+    p.VdPOM_h=[vd(:,1).*arrhenius(temperatureC,53.0) ...
         .*swpOptimal(swpMPa).*phScalar(pH,4.2,1.4), ...
-        base.VdPOM_ref_h(2).*arrhenius(temperatureC,36.3) ...
+        vd(:,2).*arrhenius(temperatureC,36.3) ...
         .*swpIncreasing(swpMPa,base.biome,base.som) ...
         .*phScalar(pH,5.3,1.7)];
     kmT=arrhenius(temperatureC,30.0);
-    p.KsPOM_mg_g=kmT.*repmat(base.KsPOM_ref_mg_g,n,1);
-    p.VdMOM_h=base.VdMOM_ref_h.*arrhenius(temperatureC,47.0) ...
+    p.KsPOM_mg_g=kmT.*ks;
+    p.VdMOM_h=layerProfile(base.VdMOM_ref_h,n).*arrhenius(temperatureC,47.0) ...
         .*swpIncreasing(swpMPa,base.biome,base.som) ...
         .*phScalar(pH,4.8,1.6);
-    p.KsMOM_mg_g=base.KsMOM_ref_mg_g.*kmT;
-    p.Vg_h=base.Vg_ref_h.*arrhenius(temperatureC,47.0);
-    p.Vm_h=base.Vm_ref_h.*arrhenius(temperatureC,20.0);
-    p.KsDOM_mg_g=base.KsDOM_ref_mg_g.*kmT;
+    p.KsMOM_mg_g=layerProfile(base.KsMOM_ref_mg_g,n).*kmT;
+    vm=layerProfile(base.Vm_ref_h,n);
+    p.Vg_h=layerProfile(base.Vg_ref_h,n).*arrhenius(temperatureC,47.0);
+    p.Vm_h=vm.*arrhenius(temperatureC,20.0);
+    p.KsDOM_mg_g=layerProfile(base.KsDOM_ref_mg_g,n).*kmT;
     p.Yg=min(0.9,max(0.01,base.Yg_ref ...
         -base.Yg_slope_per_C.*(temperatureC-20)));
     dry=swpA2D(swpMPa,base.SWP_A2D_MPa,base.wdorm);
     wet=swpD2A(swpMPa,base.tau.*base.SWP_A2D_MPa,base.wdorm);
-    p.rMORT_h=base.rMORT_ref_h.*dry;
-    p.VmD_h=repmat(base.VmD_ref_h,n,1);
-    p.VmA2D_h=base.Vm_ref_h.*arrhenius(temperatureC,20.0).*dry;
-    p.VmD2A_h=base.Vm_ref_h.*arrhenius(temperatureC,20.0).*wet;
+    p.rMORT_h=layerProfile(base.rMORT_ref_h,n).*dry;
+    p.VmD_h=layerProfile(base.VmD_ref_h,n);
+    p.VmA2D_h=vm.*arrhenius(temperatureC,20.0).*dry;
+    p.VmD2A_h=vm.*arrhenius(temperatureC,20.0).*wet;
+    if ~dormancyEnabled
+        p.VmD_h(:)=0;
+        p.VmA2D_h(:)=0;
+        p.VmD2A_h(:)=0;
+    end
     p.VNup_MB_h=base.VNup_MB_ref_h.*arrhenius(temperatureC,47.0);
     p.KsNH4_MB_mg_g=base.KsNH4_MB_ref_mg_g.*kmT;
     p.KsNO3_MB_mg_g=base.KsNO3_MB_ref_mg_g.*kmT;
     p.temperature_C=temperatureC; p.swp_MPa=swpMPa; p.pH=pH;
+end
+
+function value=layerProfile(value,n)
+% Only scalar legacy values or explicit top-down columns are accepted.
+    assert(isnumeric(value)&&isreal(value)&&all(isfinite(value),'all') ...
+        &&(isscalar(value)||isequal(size(value),[n,1])), ...
+        'soil:microbe:mendKineticShape','Expected scalar or top-down NL-by-1 kinetic parameter.');
+    if isscalar(value),value=repmat(value,n,1);end
+end
+
+function value=pairProfile(value,n)
+% Columns are POM1/POM2, rows are top-down layers; never linear indexing.
+    assert(isnumeric(value)&&isreal(value)&&all(isfinite(value),'all') ...
+        &&(isequal(size(value),[1,2])||isequal(size(value),[n,2])), ...
+        'soil:microbe:mendKineticShape','Expected 1-by-2 or top-down NL-by-2 POM parameter.');
+    if size(value,1)==1,value=repmat(value,n,1);end
 end
 
 function value=arrhenius(t,eakJmol)
@@ -75,9 +112,13 @@ function [minimum,w]=swpShape(biome,som)
         case "ASM"
             if som=="SOL", minimum=-10.95; w=1.26; end
         case "MGC"
-            if som=="SOD", minimum=-1.71; w=1.43;
-            elseif som=="SOL", minimum=-22.61; w=1.11;
-            elseif som=="LIT", minimum=-39.73; w=0.89; end
+            if som=="SOD"
+                minimum=-1.71; w=1.43;
+            elseif som=="SOL"
+                minimum=-22.61; w=1.11;
+            elseif som=="LIT"
+                minimum=-39.73; w=0.89;
+            end
         case "MDF"
             if som=="SOL", minimum=-4.97; w=1.07;
             elseif som=="LIT", minimum=-29.00; w=1.27; end

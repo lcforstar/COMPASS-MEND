@@ -8,8 +8,8 @@ function result=runCOMPASSBiogeochemistrySpinup(siteDir,options)
 %
 %   OPTIONS: cycles (default 1), n_steps (default configured window), and
 %   output_dir. progress_interval controls accepted-step telemetry (default
-%   24 h). The returned checkpoint is suitable for a production resume;
-%   production need not read DOC/DON columns again.
+%   24 h). A checkpoint continues this cycle at its original accepted time;
+%   it is NOT a measured-constrained production t0 initialization artifact.
 %
 %   Editor: Jizixing Zhu; Date: 2026-08-21.
 %   Change: 2026-08-24 Jizixing Zhu -- add cycle-level DOM, MEMC, PlantCN,
@@ -25,10 +25,13 @@ function result=runCOMPASSBiogeochemistrySpinup(siteDir,options)
 %   resume_first_cycle_checkpoint [char] must belong to this first cycle and
 %   the same site/forcing. Use a new output directory; old diagnostics are
 %   not in the checkpoint and are not reconstructed before the resume KT.
+%   Change: 2026-09-29 Wenjie Liu -- bind replay cycles to full immutable
+%   identity, rebuild accepted-state caches/root-water memory, preserve canopy
+%   seam history, isolate resume environment, and derive the default window.
     arguments
         siteDir (1,:) char
         options.cycles (1,1) double {mustBeInteger,mustBePositive}=1
-        options.n_steps (1,1) double {mustBeInteger,mustBePositive}=8760
+        options.n_steps (1,1) double=NaN
         options.output_dir (1,:) char=''
         options.progress_interval (1,1) double {mustBeInteger,mustBePositive}=24
         options.auto_stop (1,1) logical=true
@@ -51,66 +54,100 @@ function result=runCOMPASSBiogeochemistrySpinup(siteDir,options)
         outputRoot=options.output_dir;
     end
     if ~isfolder(outputRoot), mkdir(outputRoot); end
-    oldOutput=getenv('COMPASS_OUTPUT'); oldMax=getenv('COMPASS_MAX_KT');
-    cleanup=onCleanup(@()restoreEnvironment(oldOutput,oldMax));
-    setenv('COMPASS_MAX_KT',sprintf('%d',options.n_steps));
+    envNames={'COMPASS_OUTPUT','STEMMUS_OUTPUT','COMPASS_MAX_KT', ...
+        'STEMMUS_MAX_KT','COMPASS_RESUME_FILE','STEMMUS_RESUME_FILE'};
+    envValues=cellfun(@getenv,envNames,'UniformOutput',false);
+    cleanup=onCleanup(@()restoreEnvironment(envNames,envValues)); %#ok<NASGU>
+    for i=3:numel(envNames),setenv(envNames{i},'');end
+    nSteps=options.n_steps; identity=[]; configuredSteps=NaN;
     carry=[]; checkpointFiles=strings(options.cycles,1);
     cycleAudits=cell(options.cycles,1);
     convergence=cell(options.cycles,1); acceleration=cell(options.cycles,1);
     history=cell(0,1); stableCount=0; lastAccelerationCycle=0;
     completedCycles=0; stopReason='maximum_cycles';
     for cycle=1:options.cycles
-        fprintf('[BGC cycle-start] cycle=%d/%d steps=%d\n', ...
-            cycle,options.cycles,options.n_steps);
         cycleDir=fullfile(outputRoot,sprintf('cycle%02d',cycle));
         setenv('COMPASS_OUTPUT',cycleDir);
         model=init.initialize(siteDir);
+        if cycle==1
+            configuredSteps=model.built.control.time.tS;
+            if isnan(nSteps),nSteps=configuredSteps;end
+            assert(isfinite(nSteps)&&nSteps>=1&&nSteps==fix(nSteps) ...
+                &&nSteps<=configuredSteps, ...
+                'runCOMPASSBiogeochemistrySpinup:window', ...
+                'n_steps must be an integer inside the configured forcing window.');
+            setenv('COMPASS_MAX_KT',sprintf('%d',nSteps));
+            identity=init.buildBiogeochemistryCycleIdentity(model);
+        else
+            assert(isequaln(identity,init.buildBiogeochemistryCycleIdentity(model)), ...
+                'runCOMPASSBiogeochemistrySpinup:identity', ...
+                'Model/source/forcing identity changed between cycles.');
+        end
+        fprintf('[BGC cycle-start] cycle=%d/%d steps=%d\n', ...
+            cycle,options.cycles,nSteps);
         assert(model.built.control.time.Delt_t==3600, ...
             'runCOMPASSBiogeochemistrySpinup:outerStep', ...
             'Biogeochemistry spin-up requires a 3600 s outer step.');
         assert(model.built.control.switches.lSoilDOM==1, ...
             'runCOMPASSBiogeochemistrySpinup:domDisabled', ...
             'dissolved_organic_matter must be true.');
-        if ~isempty(carry)
-            assertCompatibleCarry(carry,model.built.Y);
-            model.built.Y=carry;
-        end
-        cycleInitial=model.built.Y;
         model=init.prepareRuntime(model);
         model.runtime.biogeochemistry_spinup=true;
+        model.runtime.biogeochemistry_spinup_identity=identity;
+        model.runtime.biogeochemistry_spinup_cycle_steps=nSteps;
+        if ~isempty(carry)
+            model=init.applyBiogeochemistryCycleCarry(model,carry);
+        end
+        cycleInitial=model.built.Y;
         if ~isempty(options.resume_first_cycle_checkpoint)
             model.runtime.resume.requested=(cycle==1);
             model.runtime.resume.file=options.resume_first_cycle_checkpoint;
+            if cycle==1
+                saved=io.loadCompassCheckpoint(options.resume_first_cycle_checkpoint);
+                assert(isfield(saved.runtime,'biogeochemistry_spinup_identity') ...
+                    &&isequaln(saved.runtime.biogeochemistry_spinup_identity,identity) ...
+                    &&isfield(saved.runtime,'biogeochemistry_spinup_cycle_steps') ...
+                    &&saved.runtime.biogeochemistry_spinup_cycle_steps==nSteps, ...
+                    'runCOMPASSBiogeochemistrySpinup:resumeIdentity', ...
+                    'Resume requires an identity-bound checkpoint from this spin-up model.');
+                if isfield(saved.runtime,'biogeochemistry_cycle')
+                    error('runCOMPASSBiogeochemistrySpinup:resumeCycleIndex', ...
+                        'resume_first_cycle_checkpoint cannot be a later replay cycle.');
+                end
+            end
         end
         model=beginRun(model);
         firstKt=model.runtime.run_control.next_kt;
-        assert(firstKt>=1&&firstKt<=options.n_steps+1, ...
+        assert(firstKt>=1&&firstKt<=nSteps+1, ...
             'runCOMPASSBiogeochemistrySpinup:resumeRange','Checkpoint outside forcing window.');
         if cycle==1&&~isempty(options.resume_first_cycle_checkpoint)
-            fprintf('[BGC resume] cycle=1 KT=%d/%d\n',firstKt-1,options.n_steps);
+            fprintf('[BGC resume] cycle=1 KT=%d/%d\n',firstKt-1,nSteps);
         end
-        for kt=firstKt:options.n_steps
+        for kt=firstKt:nSteps
             [model,report]=runOneStep(model,kt);
             if report.step_failed
                 error('runCOMPASSBiogeochemistrySpinup:stepFailed', ...
                     'Cycle %d rejected KT=%d: %s',cycle,kt, ...
                     char(report.termination_reason));
             end
-            if mod(kt,options.progress_interval)==0 || kt==options.n_steps
-                printProgress(model,cycle,kt,options.n_steps);
+            if mod(kt,options.progress_interval)==0 || kt==nSteps
+                printProgress(model,cycle,kt,nSteps);
             end
         end
         cycleAudits{cycle}=validateBiogeochemistryCycle( ...
-            model,cycleInitial,options.n_steps,cycle);
+            model,cycleInitial,nSteps,cycle);
+        cycleAudits{cycle}.resumed_at_kt=firstKt-1;
+        cycleAudits{cycle}.full_configured_window=(nSteps==configuredSteps);
         model=finalizeRun(model);
-        carry=model.built.Y;
-        history{end+1}=carry; %#ok<AGROW>
+        carriedY=model.built.Y;
+        history{end+1}=carriedY; %#ok<AGROW>
         if cycle>=2
             convergence{cycle}=soil.organic.maxRelativePoolCarbonChange( ...
                 history{end-1},history{end},options.absolute_floor);
             convergence{cycle}.tolerance=options.relative_tolerance;
             convergence{cycle}.converged= ...
-                convergence{cycle}.max_relative_change<=options.relative_tolerance;
+                convergence{cycle}.max_relative_change<=options.relative_tolerance ...
+                &&nSteps==configuredSteps;
         else
             convergence{cycle}=struct('max_relative_change',Inf, ...
                 'state_path','','element_index',NaN,'C_start',NaN,'C_end',NaN, ...
@@ -121,17 +158,17 @@ function result=runCOMPASSBiogeochemistrySpinup(siteDir,options)
         canAccelerate=options.slow_pool_acceleration&&cycle>=options.acceleration_start_cycle ...
             &&cycle<=options.cycles-options.final_rebalance_cycles&&numel(history)>=3;
         if canAccelerate
-            [carry,acceleration{cycle}]=soil.organic.accelerateSlowPools( ...
+            [carriedY,acceleration{cycle}]=soil.organic.accelerateSlowPools( ...
                 history{end-2},history{end-1},history{end}, ...
                 options.acceleration_max_factor);
             if acceleration{cycle}.applied
-                history{end}=carry; lastAccelerationCycle=cycle; stableCount=0;
+                history{end}=carriedY; lastAccelerationCycle=cycle; stableCount=0;
             end
         else
             acceleration{cycle}=struct('applied',false,'accelerated_elements',0, ...
                 'method','none','maximum_factor',1);
         end
-        model.built.Y=carry;
+        model.built.Y=carriedY;
         naturalCycles=cycle-lastAccelerationCycle;
         observerConverged=true;
         if ~isempty(options.cycle_observer)
@@ -147,7 +184,11 @@ function result=runCOMPASSBiogeochemistrySpinup(siteDir,options)
         else
             stableCount=0;
         end
-        checkpointFiles(cycle)=string(io.saveCompassCheckpoint(model,options.n_steps));
+        carry=init.captureBiogeochemistryCycleCarry(model,cycle);
+        assert(isequaln(carry.identity,identity), ...
+            'runCOMPASSBiogeochemistrySpinup:identity', ...
+            'Immutable model identity changed while integrating the cycle.');
+        checkpointFiles(cycle)=string(io.saveCompassCheckpoint(model,nSteps));
         completedCycles=cycle;
         fprintf(['[BGC convergence] cycle=%d max_rel=%.8g path=%s ', ...
             'stable=%d/%d accelerated=%d rebalance=%d/%d\n'],cycle, ...
@@ -165,11 +206,14 @@ function result=runCOMPASSBiogeochemistrySpinup(siteDir,options)
     convergence=convergence(1:completedCycles);
     acceleration=acceleration(1:completedCycles);
     result=struct('schema_version',3,'cycles',completedCycles, ...
-        'maximum_cycles',options.cycles,'cycle_steps',options.n_steps, ...
+        'maximum_cycles',options.cycles,'cycle_steps',nSteps, ...
+        'configured_window_steps',configuredSteps, ...
+        'periodic_convergence_eligible',nSteps==configuredSteps, ...
+        'cycle_identity',identity, ...
         'checkpoint_files',checkpointFiles, ...
         'checkpoint_file',checkpointFiles(end),'cycle_audits',{cycleAudits}, ...
         'convergence',{convergence},'acceleration',{acceleration}, ...
-        'stop_reason',stopReason,'final_state',carry, ...
+        'stop_reason',stopReason,'final_state',carry.Y, ...
         'production_equations_modified',false, ...
         'acceleration_method','bounded_periodic_aitken_slow_pools', ...
         'colm_sasu_exact',false);
@@ -330,25 +374,10 @@ function printProgress(model,cycle,kt,nSteps)
         cycle,kt,nSteps,docInventory,donInventory,min(mb),max(mb));
 end
 
-function assertCompatibleCarry(source,target)
-% Validate that a carried checkpoint state matches a new cycle state.
-% Editor: Jizixing Zhu; Date: 2026-08-21.
-    required={'soil_dom','soil_organic'};
-    for i=1:numel(required)
-        assert(isfield(source,required{i})&&isfield(target,required{i}), ...
-            'runCOMPASSBiogeochemistrySpinup:carryMismatch', ...
-            'Spin-up carry lacks %s.',required{i});
-    end
-    assert(numel(source.soil_dom.doc_total_g_cm3) ...
-        ==numel(target.soil_dom.doc_total_g_cm3), ...
-        'runCOMPASSBiogeochemistrySpinup:gridMismatch', ...
-        'Spin-up grid changed between cycles.');
-end
-
-function restoreEnvironment(output,maxKt)
+function restoreEnvironment(names,values)
 % Restore process-local COMPASS run environment variables.
 % Editor: Jizixing Zhu; Date: 2026-08-21.
-    setenv('COMPASS_OUTPUT',output); setenv('COMPASS_MAX_KT',maxKt);
+    for i=1:numel(names),setenv(names{i},values{i});end
 end
 
 % Change: 2026-09-02 Jizixing Zhu -- include xsmr debt writeoff in the

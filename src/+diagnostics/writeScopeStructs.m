@@ -109,6 +109,11 @@ function writeScopeStructs(reg, fluxes, thermal, profiles, rad, KT, cfg)
     tryWrite(reg, 'assimilation_total',         fluxes, 'Atot',    KT);
     if switchEnabled(cfg, 'lPlantCN') && switchEnabled(cfg, 'lNefc')
         tryWrite(reg, 'respiration_ecosystem',  fluxes, 'Resp',    KT);
+        tryWrite(reg, 'respiration_plant', fluxes, 'Ra_plant', KT);
+        tryWrite(reg, 'respiration_aom', fluxes, 'Rh_aom', KT);
+        tryWrite(reg, 'respiration_mend', fluxes, 'Rh_mend', KT);
+        tryWrite(reg, 'respiration_heterotrophic', fluxes, 'Rh', KT);
+        tryWrite(reg, 'respiration_ecosystem_carbon', fluxes, 'Reco', KT);
     end
     tryWrite(reg, 'leaf_dark_respiration',      fluxes, 'Rd_leaf', KT);  % [Phase C M2-B.1a 2026-05-19]
     tryWrite(reg, 'stomatal_conductance_sun',   fluxes, 'gs_sun',  KT);  % [gs output 2026-06-13] gs=1/rcw, set in vegetation.energy.ebal / ebalProfile

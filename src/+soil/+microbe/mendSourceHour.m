@@ -14,6 +14,9 @@ function [out, nn, newdin, ledger] = mendSourceHour(c,n,din,p,addC,addN,ihr,dt_s
 % Change: 2026-09-14 Jizixing Zhu -- optional root-reserved total DIN inventory
 %   caps first uptake independently of free-substrate kinetics. Default remains
 %   exact source. Coupled mode omits source plant competition denominator terms.
+% Change: 2026-10-09 Wenjie Liu -- bounded substrate C transfers carry a shared
+%   donor N budget, with exact depletion and remaining-first balances. DON
+%   must be nonnegative; dynamic sorption gross-recycling formulas are retained.
     assert(isscalar(dt_s)&&isfinite(dt_s)&&dt_s==3600, ...
         'soil:microbe:sourceHourClock','Source discrete map requires exactly 3600 s.');
     assert(isscalar(ihr)&&ismember(ihr,[0 1]), ...
@@ -76,7 +79,7 @@ function [out, nn, newdin, ledger] = mendSourceHour(c,n,din,p,addC,addN,ihr,dt_s
         dec=mm(p.(['VP' suffix]),c.(pool),c.(['ENZP' suffix '_C']),p.(['KP' suffix]));
         f.(['POMdec' suffix])=dec;
         f.(['POMdec2DOM' suffix])=p.fD.*dec;
-        f.(['POMdec2MOM' suffix])=(1-p.fD).*dec;
+        f.(['POMdec2MOM' suffix])=dec-f.(['POMdec2DOM' suffix]);
     end
     f.MOMdec=mm(p.VM,c.MOM_C,c.ENZM_C,p.KM);f.MOM2DOM=f.MOMdec;
     d=c.DOMT_C;b=c.MBA_C;q=c.QOM_C;
@@ -112,12 +115,13 @@ function [out, nn, newdin, ledger] = mendSourceHour(c,n,din,p,addC,addN,ihr,dt_s
     mb=b+f.DOM2MBA-f.CO2_growth-f.CO2_maintn_MBA-f.MBA_PM-f.MBA2MBD+f.MBD2MBA;
     f.MBA2MBD=f.MBA2MBD+min(mb,0); % Source signed compensation, not a mass clamp.
     out=c;
-    out.POMO_C=c.POMO_C+addC.POMinp1-f.POMdec1+f.MBA2POM1;
-    out.POMH_C=c.POMH_C+addC.POMinp2-f.POMdec2+f.MBA2POM2;
-    out.MOM_C=c.MOM_C+f.POMdec2MOM1+f.POMdec2MOM2-f.MOMdec;
+    out.POMO_C=(c.POMO_C-f.POMdec1)+addC.POMinp1+f.MBA2POM1;
+    out.POMH_C=(c.POMH_C-f.POMdec2)+addC.POMinp2+f.MBA2POM2;
+    out.MOM_C=(c.MOM_C-f.MOMdec)+f.POMdec2MOM1+f.POMdec2MOM2;
     out.QOM_C=q+f.DOM2QOMnet;
-    out.DOMT_C=d+addC.DOMinp+f.POMdec2DOM1+f.POMdec2DOM2+f.MOMdec ...
-        +f.MBA2DOM+f.EP2DOM1+f.EP2DOM2+f.EM2DOM-f.DOM2MBA-f.DOM2QOMnet;
+    out.DOMT_C=(available-f.DOM2QOMnet)+addC.DOMinp ...
+        +f.POMdec2DOM1+f.POMdec2DOM2+f.MOMdec ...
+        +f.MBA2DOM+f.EP2DOM1+f.EP2DOM2+f.EM2DOM;
     out.MBA_C=max(mb,0);
     out.MBD_C=c.MBD_C-f.CO2_maintn_MBD+f.MBA2MBD-f.MBD2MBA;
     out.ENZP1_C=c.ENZP1_C+f.MBA2EP1-f.EP2DOM1;
@@ -128,15 +132,29 @@ function [out, nn, newdin, ledger] = mendSourceHour(c,n,din,p,addC,addN,ihr,dt_s
     nf=struct();
     for j=1:2
         if j==1,pool='POMO';else,pool='POMH';end
-        for prefix={'POMdec','POMdec2DOM','POMdec2MOM'}
-            key=[prefix{1} num2str(j)];nf.(key)=f.(key).*ratio.(pool);
-        end
+        suffix=num2str(j);key=['POMdec' suffix];
+        nf.(key)=boundedDonorN(f.(key),c.([pool '_C']),n.([pool '_N']));
+        nf.(['POMdec2DOM' suffix])=p.fD.*nf.(key);
+        nf.(['POMdec2MOM' suffix])=nf.(key)-nf.(['POMdec2DOM' suffix]);
     end
-    donor={'MOMdec','MOM';'MOM2DOM','MOM';'QOM2DOM','QOM'; ...
-        'DOM2QOM','DOMT';'DOM2MBA','DOMT';'MBA2DOM','MBA'; ...
+    nf.MOMdec=boundedDonorN(f.MOMdec,c.MOM_C,n.MOM_N);nf.MOM2DOM=nf.MOMdec;
+    nf.DOM2MBA=boundedDonorN(f.DOM2MBA,d,n.DOMT_N);
+    donor={'QOM2DOM','QOM';'DOM2QOM','DOMT';'MBA2DOM','MBA'; ...
         'MBA2POM1','MBA';'MBA2POM2','MBA';'MBA_mortality','MBA'; ...
         'MBA2MBD','MBA';'MBD2MBA','MBD'};
     for j=1:size(donor,1),nf.(donor{j,1})=f.(donor{j,1}).*ratio.(donor{j,2});end
+    % Uptake and adsorption share the same pre-step DOM donor. For adsorption
+    % within the residual C stock, allocate its N from that SAME remainder.
+    % Gross recycling can borrow C from contemporaneous desorption; retain
+    % the source donor-ratio formula there rather than impose a new N limiter.
+    domRemainingN=n.DOMT_N-nf.DOM2MBA;
+    boundedAds=f.DOM2QOM>=0&f.DOM2QOM<=available;
+    nf.DOM2QOM(boundedAds)=boundedDonorN(f.DOM2QOM(boundedAds), ...
+        available(boundedAds),domRemainingN(boundedAds));
+    boundedDes=f.QOM2DOM>=0&f.QOM2DOM<=q;
+    nf.QOM2DOM(boundedDes)=boundedDonorN(f.QOM2DOM(boundedDes), ...
+        q(boundedDes),n.QOM_N(boundedDes));
+    domRemainingN=domRemainingN-nf.DOM2QOM+nf.QOM2DOM;
     for key={'MBA2EP1','MBA2EP2','MBA2EM','EP2DOM1','EP2DOM2','EM2DOM'}
         nf.(key{1})=f.(key{1})./3;
     end
@@ -158,12 +176,12 @@ function [out, nn, newdin, ledger] = mendSourceHour(c,n,din,p,addC,addN,ihr,dt_s
     end
     first4=uptake4;first3=uptake3;
     nn=n;
-    nn.POMO_N=n.POMO_N+addN.POMinp1-nf.POMdec1+nf.MBA2POM1;
-    nn.POMH_N=n.POMH_N+addN.POMinp2-nf.POMdec2+nf.MBA2POM2;
-    nn.MOM_N=n.MOM_N+nf.POMdec2MOM1+nf.POMdec2MOM2-nf.MOMdec;
+    nn.POMO_N=(n.POMO_N-nf.POMdec1)+addN.POMinp1+nf.MBA2POM1;
+    nn.POMH_N=(n.POMH_N-nf.POMdec2)+addN.POMinp2+nf.MBA2POM2;
+    nn.MOM_N=(n.MOM_N-nf.MOMdec)+nf.POMdec2MOM1+nf.POMdec2MOM2;
     nn.QOM_N=n.QOM_N+nf.DOM2QOMnet;
-    nn.DOMT_N=n.DOMT_N+addN.DOMinp+nf.POMdec2DOM1+nf.POMdec2DOM2+nf.MOMdec ...
-        +nf.MBA2DOM+nf.EP2DOM1+nf.EP2DOM2+nf.EM2DOM-nf.DOM2MBA-nf.DOM2QOMnet;
+    nn.DOMT_N=domRemainingN+addN.DOMinp+nf.POMdec2DOM1+nf.POMdec2DOM2+nf.MOMdec ...
+        +nf.MBA2DOM+nf.EP2DOM1+nf.EP2DOM2+nf.EM2DOM;
     nn.MBA_N=n.MBA_N+nf.DOM2MBA-nf.MBA_PM-nf.MBA2MBD+nf.MBD2MBA+uptake4+uptake3-releaseMB;
     nn.MBD_N=n.MBD_N+nf.MBA2MBD-nf.MBD2MBA;
     nn.ENZP1_N=n.ENZP1_N+nf.MBA2EP1-nf.EP2DOM1;
@@ -220,6 +238,19 @@ function value=mm(v,s,e,k)
     value=min(v.*s.*e./(k+s),s);
 end
 
+function value=boundedDonorN(carbonFlux,carbonStock,nitrogenStock)
+% Paired N [mg N/g soil] for a nonnegative, donor-bounded C transfer. Columns
+% may be empty subsets. Fraction-first arithmetic cannot exceed donor N;
+% explicit depletion also leaves zero N when its paired C stock is exhausted.
+% This is not a limiter for signed microbial or gross sorption transfers.
+% Editor: Wenjie Liu; Date: 2026-10-09.
+    assert(all(carbonFlux>=0&carbonFlux<=carbonStock), ...
+        'soil:microbe:sourceHourDonorBudget','Unbounded substrate carbon transfer.');
+    value=zeros(size(carbonFlux));active=carbonStock>0;
+    value(active)=nitrogenStock(active).*(carbonFlux(active)./carbonStock(active));
+    depleted=carbonFlux==carbonStock;value(depleted)=nitrogenStock(depleted);
+end
+
 function validateField(s,name,count,allowScalar)
 % Validate explicit source columns; parameters may also be scalar.
 % Editor: Jizixing Zhu; Date: 2026-09-14.
@@ -233,8 +264,11 @@ function validateField(s,name,count,allowScalar)
 end
 
 function validateResult(v,name)
-% Preserve signed roundoff; never manufacture mass by clamping a result.
+% Never manufacture mass by clamping a result. DON must pass the same strict
+% nonnegativity contract as the next source-hour input.
 % Editor: Jizixing Zhu; Date: 2026-09-14.
-    assert(all(isfinite(v))&&all(v>=-1e-12), ...
+% Change: 2026-10-09 Wenjie Liu -- reject every negative DON proposal.
+    lower=-1e-12;if strcmp(name,'DOMT_N'),lower=0;end
+    assert(all(isfinite(v))&&all(v>=lower), ...
         'soil:microbe:sourceHourNegative','Invalid source-hour result %s.',name);
 end

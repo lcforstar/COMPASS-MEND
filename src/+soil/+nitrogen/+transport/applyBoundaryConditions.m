@@ -1,5 +1,11 @@
 function [RHS,RHS1,C4,C4_a,C3,C3_a,cTop_NO3,cTop_NH4] = applyBoundaryConditions(RHS1,C3,C3_a,RHS,NBCN,NBCNB,KT,C4,NN,C4_a,QL_nodes,Thmrlefc,QMB,cBot_NH4,cTop_NH4,cBot_NO3,cTop_NO3,lBNF,BNF)
 %APPLYBOUNDARYCONDITIONS  Apply NH4/NO3 transport boundary conditions to the linear system.
+%   QL_nodes follows the global vertical coordinate: positive is upward.
+%   Therefore downward top inflow has QL_nodes(NN)<0, whereas upward bottom
+%   inflow has QL_nodes(1)>0. Public input/loss diagnostics are derived from
+%   this raw convention after the solve; the ADE boundary equations below
+%   retain their historical signs.
+% Change: 2026-09-21 Wenjie Liu -- state the shared raw-flux sign contract.
 %% NH4+__N
 %%%%%%%%%% Apply the bottom boundary condition called for by NBCNB %%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

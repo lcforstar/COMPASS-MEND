@@ -24,6 +24,8 @@ function built = commitCandidate(built, candidate)
 % Change: 2026-09-12 Codex -- retain accepted post-root DIN availability as
 %   diagnostic-only runtime memory alongside the root reservation ledger.
 % Change: 2026-09-14 Codex -- commit O2 capacity history with its concentration.
+% Change: 2026-09-21 Wenjie Liu -- commit the passive fertilizer-N source
+%   label atomically with the total soil/organic candidate.
     assert(isstruct(candidate) && isfield(candidate, 'trial') ...
         && isfield(candidate, 'derived'), ...
         'soil:commitCandidate:invalidCandidate', ...
@@ -84,6 +86,15 @@ function built = commitCandidate(built, candidate)
         if isfield(nitrogen,'microbes') && ~isempty(nitrogen.microbes)
             built.Y.soil_microbes=nitrogen.microbes.state;
             built.workspace.soil_microbes=nitrogen.microbes;
+        end
+        if isfield(nitrogen,'fertilizer_tracer') ...
+                &&~isempty(nitrogen.fertilizer_tracer)
+            tracer=nitrogen.fertilizer_tracer;
+            assert(isfield(tracer,'state')&&isfield(tracer,'diagnostics'), ...
+                'soil:commitCandidate:fertilizerTracer', ...
+                'Accepted fertilizer tracer lacks state or diagnostics.');
+            built.Y.soil_fertilizer_n_tracer=tracer.state;
+            built.workspace.fertilizer_n_tracer=tracer.diagnostics;
         end
     end
 end

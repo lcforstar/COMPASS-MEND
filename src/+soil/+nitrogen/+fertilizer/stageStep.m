@@ -1,4 +1,4 @@
-function [model, fertilizer, applied_next] = stageStep(model, kt, dt_outer_s)
+function [model, fertilizer, applied_next] = stageStep(model, ~, dt_outer_s)
 %STAGESTEP  Stage one scheduled fertilizer event without consuming it.
 %
 %   Inputs:
@@ -17,7 +17,8 @@ function [model, fertilizer, applied_next] = stageStep(model, kt, dt_outer_s)
 % Change: 2026-09-16 Jizixing Zhu -- match [step start, step end) like organic inputs.
     fertilizer = struct( ...
         'applied', false, 'nh4_added', 0, ...
-        'no3_added', 0, 'urea_added', 0);
+        'no3_added', 0, 'urea_added', 0, ...
+        'tracer_increment',[]);
     built = model.built;
     applied_next = model.runtime.management.fertilizer.applied;
     if ~isfield(built.control.switches, 'lNefc') ...

@@ -72,3 +72,9 @@ function built = scatterNitrogenVariables(built, NV, kt)
     built.diagnostics.turnover_diag(kt) = NV.turnover_diag(2);
     built.diagnostics.frPHU_diag(kt)    = NV.frPHU_diag(2);
 end
+
+% Change: 2026-09-30 Wenjie Liu -- commit enabled annual standing-leaf and
+% stem WSC inventories and accepted event memory through the same adapter.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

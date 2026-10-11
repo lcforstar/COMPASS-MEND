@@ -99,3 +99,9 @@ function NV = assembleNitrogenVariables(built, kt)
     NV.turnover_diag = repmat(built.diagnostics.turnover_diag(kt), 2, 1);   % [2 x 1 struct]
     NV.frPHU_diag    = repmat(built.diagnostics.frPHU_diag(kt),    2, 1);   % [2 x 1]
 end
+
+% Change: 2026-09-30 Wenjie Liu -- carry enabled annual standing-leaf and
+% stem WSC inventories; preserve non-crop pool schemas.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

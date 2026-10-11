@@ -84,6 +84,12 @@ function [C_pools_out, nsc_diag] = applyNSCCoupling( ...
 %   Editor: Jizixing Zhu; Date: 2026-08-24.
 %   Change: 2026-08-24 Jizixing Zhu -- enforce one no-debt affordability
 %           budget across maintenance and growth respiration.
+%   Change: 2026-09-30 Wenjie Liu -- winter_wheat_cn uses physical NSC
+%           funding independently of the potential-respiration scheme. The
+%           same cap is used by resp_only N demand and applied C allocation.
+%           No crop debt is created, repaid or written off. This intentionally
+%           differs from the signed CLM/CoLM xsmr accounting convention.
+%           Legacy nonzero crop xsmr must not be silently imported.
 
     % --- Step 1: respiration fluxes this dt ---
     R_m_g       = max(R_m_total_kg, 0) * 1000 * dt;     % [g C/m2/dt] maintenance respiration
@@ -91,6 +97,16 @@ function [C_pools_out, nsc_diag] = applyNSCCoupling( ...
     R_g_g_pot   = R_g_g;                                  % preserve pre-affordability potential
     GPP_in_KT_g = max(GPP_kg, 0)       * 1000 * dt;     % [g C/m2/dt]
     if nargin < 11 || isempty(C_xsmr_prev_g), C_xsmr_prev_g = 0; end   % [g C/m2] xsmrpool prev (<=0 = debt)
+    isWinterWheat=isfield(pftParams,'winter_wheat_cn') ...
+        &&isequal(pftParams.winter_wheat_cn,1);
+    if isWinterWheat
+        assert(isscalar(C_xsmr_prev_g)&&isfinite(C_xsmr_prev_g)&&C_xsmr_prev_g==0, ...
+            'applyNSCCoupling:winterWheatDebt', ...
+            'Physical crop funding requires zero xsmr; restart from a new measured initial state.');
+        mobile=[C_pools_prev.C_labile,C_pools_prev.C_root_storage,C_pools_prev.C_stem_storage];
+        assert(all(isfinite(mobile))&&all(mobile>=0), ...
+            'applyNSCCoupling:winterWheatSubstrate','Physical crop NSC must be finite and nonnegative.');
+    end
 
     % --- Step 1b: maintenance-respiration substrate scheme (EXPERIMENT switch, 2026-06-12) ---
     % [resp-substrate EXP 2026-06-12] Maintenance respiration is C-substrate limited, NOT a fixed
@@ -147,7 +163,11 @@ function [C_pools_out, nsc_diag] = applyNSCCoupling( ...
     beta_sub = R_m_g / max(R_m_g_pot, eps);                         % [-] effective turn-down (diagnostic)
 
     % --- Step 2: maintenance-respiration funding (xsmr debt pool vs nodebt) ---
-    if resp_scheme == 4
+    physicalFunding=(resp_scheme==4)||isWinterWheat;
+    if physicalFunding
+        % Winter wheat: retain its selected potential Rm (scheme 0 has no
+        % empirical turn-down), but apply only carbon that exists. This is a
+        % mass-availability limiter, not a fitted respiration coefficient.
         % [resp tc_mm_nodebt EXP 2026-06-12] Fund the (beta-throttled) R_m DIRECTLY from C_labile,
         %   with NO xsmrpool debt. Cap R_m at what GPP + C_labile can fund this step, so the plant
         %   respires only what it can afford (graded down-regulation), never carrying a deficit. The
@@ -224,7 +244,10 @@ function [C_pools_out, nsc_diag] = applyNSCCoupling( ...
     %   Was 'R_a_potential_g = R_a_actual_g', which silently equated the two so r_a_potential /
     %   cum_r_a_potential lost the un-throttled value. R_g_g is not throttled, so it is common to both.
     R_a_potential_g = R_m_g_pot + R_g_g_pot;                      % [g C/m2/dt] potential (before substrate/affordability limits)
-    storage_drawdown_event = double(R_m_xs_g > 1e-9);             % [-] 1 = ran on xsmr debt this step (diag)
+    storage_drawdown_event = double(R_m_xs_g > 1e-9);             % [-] legacy debt-path event
+    if isWinterWheat
+        storage_drawdown_event=double(R_a_actual_g>GPP_in_KT_g); % actual NSC withdrawal, not debt
+    end
 
     resp_only = nargin >= 9 && isstruct(A_N_g) && isfield(A_N_g, 'mode') && strcmp(A_N_g.mode, 'resp_only');
     if resp_only
@@ -280,7 +303,7 @@ function [C_pools_out, nsc_diag] = applyNSCCoupling( ...
     %   (C_labile += deficit, C_xsmr -= deficit; net 0).
     cpool_deficit_g    = max(-C_pools_out.C_labile, 0);            % [g C/m2] cpool shortfall this step
     C_pools_out.C_labile = C_pools_out.C_labile + cpool_deficit_g; % -> 0 (no carbon created)
-    if resp_scheme == 4
+    if physicalFunding
         % [nodebt 2026-06-12] Cover the C_labile deficit from C_storage (starch remobilisation), root
         %   reserve first then stem. The shared total-respiration cap above guarantees no residual
         %   demand remains after both reserves are exhausted; any residual is an internal error.
@@ -289,9 +312,15 @@ function [C_pools_out, nsc_diag] = applyNSCCoupling( ...
         draw_s = min(cpool_deficit_g - draw_r, max(C_pools_out.C_stem_storage, 0));
         C_pools_out.C_stem_storage = C_pools_out.C_stem_storage - draw_s;
         residual_g   = cpool_deficit_g - draw_r - draw_s;
-        assert(residual_g<=1e-9, ...
+        fundingTolerance=1e-9; % retain the existing non-crop scheme-4 contract
+        if isWinterWheat
+            % Roundoff of a short sum of g C/m2 terms; not a physical source,
+            % fitted absolute floor or annual conservation tolerance.
+            fundingTolerance=64*eps(max([GPP_in_KT_g,nsc_avail_g,R_a_actual_g]));
+        end
+        assert(residual_g<=fundingTolerance, ...
             'applyNSCCoupling:nodebtAffordabilityFailure', ...
-            ['tc_mm_nodebt produced an unfunded carbon demand of %g g C m^-2 ', ...
+            ['Physical NSC funding produced an unfunded carbon demand of %g g C m^-2 ', ...
              'after the total-respiration affordability cap.'],residual_g);
         C_xsmr_new_g = C_xsmr_prev_g;                              % nodebt never creates new debt
     else
@@ -346,3 +375,9 @@ function [C_pools_out, nsc_diag] = applyNSCCoupling( ...
     nsc_diag.C_to_root_storage = c_alloc_diag.C_to_root_storage;   % [g C/m2/dt]
     nsc_diag.C_to_stem_storage = c_alloc_diag.C_to_stem_storage;   % [g C/m2/dt]
 end
+
+%   Change: 2026-09-30 Wenjie Liu -- include the explicit annual stem WSC
+%           inventory in the same physical respiration affordability budget.
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

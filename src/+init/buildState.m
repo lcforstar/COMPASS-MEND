@@ -46,6 +46,8 @@ function built = buildState(raw)
 %     MEMC/MEND states from the measured-SOC-constrained COMPASS contract.
 % Change: 2026-09-14 Jizixing Zhu -- initialize explicitly selected source-hour
 %   dynamic DOM and intracellular enzyme owners after the native pool builders.
+% Change: 2026-09-21 Wenjie Liu -- initialize the detached mineral-fertilizer
+%   N source label after all corresponding total pool owners exist.
 
     built = struct();
 
@@ -161,6 +163,10 @@ function built = buildState(raw)
         built.parameters.soil_microbes = struct();
     end
     built=init.buildMendHourlyState(built,raw.config);
+    if built.control.switches.lFertilizerSourceTracer==1
+        built.Y.soil_fertilizer_n_tracer= ...
+            soil.nitrogen.tracer.emptyState(built);
+    end
     built.parameters.litter = init.buildLitterParameters( ...
         raw.config, built.control.switches.lLitterInput == 1);
     [built.Y, soilModeState] = init.applySoilModesToInitialState( ...

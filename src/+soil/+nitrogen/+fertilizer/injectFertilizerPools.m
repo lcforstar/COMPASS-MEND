@@ -41,6 +41,9 @@ function [SoilVariables, fert_diag] = injectFertilizerPools(SoilVariables, pools
 %   Editor: Jizixing Zhu; Date: 2026-07-02.
 %   Change: 2026-09-07 Jizixing Zhu -- conservative band-to-node mass projection
 %     and storage-weighted urea diagnostics on nonuniform grids.
+%   Change: 2026-09-21 Wenjie Liu -- expose the exact nodal increment of
+%     each management pool for passive source tracing; total pools are
+%     unchanged and remain the only drivers of nitrogen dynamics.
     fert_diag = struct('applied', true, 'nh4_added', 0, 'no3_added', 0, ...
                        'urea_added', 0, 'nh4_to_granule', 0);
 
@@ -71,7 +74,10 @@ function [SoilVariables, fert_diag] = injectFertilizerPools(SoilVariables, pools
 
     liquidCapacity=[dz.*Theta_LL(:,1);0]/2+[0;dz.*Theta_LL(:,2)]/2;
     nh4Capacity=liquidCapacity+[dz.*RHOKG(:);0]/2+[0;dz.*RHOKG(:)]/2;
+    nh4Before=SoilVariables.C_NH4_new;
+    no3Before=SoilVariables.C_NO3_new;
     ureaBefore=SoilVariables.C_Urea_new;
+    granuleBefore=SoilVariables.C_NH4_granule;
     SoilVariables.C_NH4_granule = SoilVariables.C_NH4_granule + ...
         projectMass(pools.nh4_granule,loadNode,bulkCapacity);
     SoilVariables.C_NH4_new = SoilVariables.C_NH4_new + ...
@@ -88,6 +94,13 @@ function [SoilVariables, fert_diag] = injectFertilizerPools(SoilVariables, pools
     fert_diag.no3_added      = cv_no3_post - cv_no3_pre;
     fert_diag.nh4_to_granule = cv_gran_post - cv_gran_pre;
     fert_diag.urea_added = bulkCapacity'*(SoilVariables.C_Urea_new-ureaBefore);
+    fert_diag.tracer_increment=struct( ...
+        'nh4_liquid',SoilVariables.C_NH4_new-nh4Before, ...
+        'no3_liquid',SoilVariables.C_NO3_new-no3Before, ...
+        'urea',SoilVariables.C_Urea_new-ureaBefore, ...
+        'nh4_granule',SoilVariables.C_NH4_granule-granuleBefore, ...
+        'units','ug N cm-3 corresponding pool', ...
+        'grid_order','bottom_up_nodes');
 end
 
 function delta = projectMass(concentration,loadNode,capacity)

@@ -15,21 +15,27 @@ function [state, parameters] = buildSoilDOM(raw, built, ~)
 %   Menten sink; DON consumption is the C:N companion of MEMC DOC uptake.
 %   Change: 2026-09-02 Codex -- read depth-resolved sorption and dispersion
 %   from soil.csv while retaining numerical transport controls in [dom].
+%   Change: 2026-09-29 Wenjie Liu -- initialize numbered organic boundary
+%     policy and disjoint input/top-export cumulative memory for restart.
     cfg = requiredSection(raw.config, 'dom');
     names = {'diffusion_cm2_s','transport_substep_s'};
     for i = 1:numel(names)
         assert(isfield(cfg, names{i}), 'buildSoilDOM:missingParameter', ...
             'dom.%s is required.', names{i});
     end
-    soil=built.parameters.soil;
+    soilParameters=built.parameters.soil;
     parameters = struct( ...
-        'kd_doc_cm3_g', soilProfile(soil,'dom_kd_doc_cm3_g',true), ...
-        'kd_don_cm3_g', soilProfile(soil,'dom_kd_don_cm3_g',true), ...
+        'kd_doc_cm3_g', soilProfile(soilParameters,'dom_kd_doc_cm3_g',true), ...
+        'kd_don_cm3_g', soilProfile(soilParameters,'dom_kd_don_cm3_g',true), ...
         'diffusion_cm2_s', positiveOrZero(cfg.diffusion_cm2_s, 'diffusion_cm2_s'), ...
-        'dispersion_cm', soilProfile(soil,'dom_dispersion_cm',false), ...
+        'dispersion_cm', soilProfile(soilParameters,'dom_dispersion_cm',false), ...
         'transport_substep_s', positiveScalar(cfg.transport_substep_s, 'transport_substep_s'), ...
         'sorption_model', 'linear_equilibrium', ...
         'direct_don_to_no3', false);
+
+    % Change: 2026-09-29 Wenjie Liu -- boundary policy is site-wide; only
+    % enabled open boundaries own checkpointed cumulative export memory.
+    parameters.boundary=soil.dom.normalizeBoundary(raw.config.boundary);
 
     theta = 0.5 * (built.Y.theta(1:end-1) + built.Y.theta(2:end));
     bulkDensity = built.parameters.soil.bulk_density(:);
@@ -53,6 +59,12 @@ function [state, parameters] = buildSoilDOM(raw, built, ~)
         'initial_doc_blank', docBlank, ...
         'initial_don_blank', donBlank, ...
         'direct_don_to_no3', false);
+    if ~strcmp(parameters.boundary.bottom_kind,'closed')
+        state.bottom_export_cumulative=struct('schema_version',1,'doc_g_cm2',0,'don_g_cm2',0);
+    end
+    if parameters.boundary.schema_version==2
+        state.boundary_exchange_cumulative=soil.dom.emptyBoundaryExchange({'doc','don'});
+    end
 end
 
 function [mass,blank,massBasis]=initialMass(tbl,z,prefix,theta,bd,kd)

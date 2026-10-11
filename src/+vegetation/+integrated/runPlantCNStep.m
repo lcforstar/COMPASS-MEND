@@ -59,11 +59,29 @@ function [NitrogenVariables, R_a_plant_kg] = runPlantCNStep( ...
 %   Previously always f_alloc_*, which mis-split Apple's spring remobilisation.
 % Change: 2026-08-24 Jizixing Zhu -- diagnose realized growth respiration
 %   from the shared no-debt respiration budget.
+% Change: 2026-09-30 Wenjie Liu -- apply one conservative grain-fill N
+%   remobilization on the accepted-to-pending crop phase edge; bind harvest
+%   seed C and N to the same available grain inventory.
+% Change: 2026-09-30 Wenjie Liu -- conserve standing-senescent leaf C/N
+%   and annual stem WSC; include applied WSC grain-conversion CO2 once.
 
     % ------------------------------------------------------------
     % Step 1: N pools_prev (KT-1 末值, KT=1 时用 init)
     % ------------------------------------------------------------
     idx_prev = max(1, KT - 1);
+    if compiledValue(demand_ctx,'winter_wheat_cn',0) == 1
+        % These are perennial onset-transfer states, not crop mobile C/N.
+        % The annual crop never creates them. Reject incompatible injected
+        % states instead of silently carrying unaccounted reserves forward.
+        crop_xfer = {'C_leaf_xfer','C_root_xfer','C_livestem_xfer', ...
+            'N_leaf_xfer','N_root_xfer','N_livestem_xfer'};
+        for ix = 1:numel(crop_xfer)
+            assert(isfield(NitrogenVariables,crop_xfer{ix}) ...
+                && NitrogenVariables.(crop_xfer{ix})(idx_prev) == 0, ...
+                'runPlantCNStep:winterWheatPerennialTransfer', ...
+                'Annual winter wheat cannot carry perennial onset pool %s.',crop_xfer{ix});
+        end
+    end
     pools_prev.N_labile     = NitrogenVariables.N_labile(idx_prev);
     pools_prev.N_leaf       = NitrogenVariables.N_leaf(idx_prev);
     pools_prev.N_root_fine  = NitrogenVariables.N_root_fine(idx_prev);
@@ -161,36 +179,41 @@ function [NitrogenVariables, R_a_plant_kg] = runPlantCNStep( ...
         'CN_target_root',   demand_ctx.pftP_demand.CN_target_root, ...
         'CN_target_stem',   demand_ctx.pftP_demand.CN_target_stem, ...
         'CN_target_fruit',  demand_ctx.pftP_demand.CN_target_fruit, ...
-        'CN_lw',            vegetation.getPFTValue(demand_ctx.pftType, 'CN_lw'), ...   % [13c per-pool clamp 2026-06-12] live wood C:N
-        'CN_dw',            vegetation.getPFTValue(demand_ctx.pftType, 'CN_dw'), ...   % [13c per-pool clamp] dead wood C:N
-        'croot_stem_alloc', vegetation.getPFTValue(demand_ctx.pftType, 'croot_stem_alloc', 0), ... % [coarse-root] NPP coarse:stem ratio
-        'froot_leaf',       vegetation.getPFTValue(demand_ctx.pftType, 'froot_leaf', 0), ...       % [fine-root] fine-root:leaf allometry
-        'stem_leaf',        vegetation.getPFTValue(demand_ctx.pftType, 'stem_leaf', 0), ...        % [CLM5 all-PFT 2026-06-13] f3 stem:leaf (natural woody; apple uses GDD-phase astem instead)
-        'retransl_fraction', vegetation.getPFTValue(demand_ctx.pftType, 'retransl_fraction'), ...
+        'CN_lw',            compiledValue(demand_ctx, 'CN_lw'), ...   % [13c per-pool clamp 2026-06-12] live wood C:N
+        'CN_dw',            compiledValue(demand_ctx, 'CN_dw'), ...   % [13c per-pool clamp] dead wood C:N
+        'croot_stem_alloc', compiledValue(demand_ctx, 'croot_stem_alloc', 0), ... % [coarse-root] NPP coarse:stem ratio
+        'froot_leaf',       compiledValue(demand_ctx, 'froot_leaf', 0), ...       % [fine-root] fine-root:leaf allometry
+        'stem_leaf',        compiledValue(demand_ctx, 'stem_leaf', 0), ...        % [CLM5 all-PFT 2026-06-13] f3 stem:leaf (natural woody; apple uses GDD-phase astem instead)
+        'retransl_fraction', compiledValue(demand_ctx, 'retransl_fraction'), ...
         'storage_cushion',   demand_ctx.pftP_demand.storage_cushion, ...
         'cn_flex_offset',    demand_ctx.pftP_demand.cn_flex_offset, ...   % [gC/gN] [FlexibleCN] 池 C:N 夹紧半幅
         'fcur',              demand_ctx.pftP_demand.fcur, ...             % [-] [A] 当年显示比例, (1−fcur)→storage
-        'ndays_on',          vegetation.getPFTValue(demand_ctx.pftType, 'ndays_on', 30), ...   % [E] onset-xfer duration (CLM5 30 d, general)
-        'fstor2tran',        vegetation.getPFTValue(demand_ctx.pftType, 'fstor2tran', 0), ...   % [E] storage->leaf onset frac (0=off unless set in PFT table; deciduous storage PFTs=0.5)
-        'has_storage_pool',  vegetation.getPFTValue(demand_ctx.pftType, 'has_storage_pool', 0), ...   % [E] onset-xfer needs a reserve pool
+        'ndays_on',          compiledValue(demand_ctx, 'ndays_on', 30), ...   % [E] onset-xfer duration (CLM5 30 d, general)
+        'fstor2tran',        compiledValue(demand_ctx, 'fstor2tran', 0), ...   % [E] storage->leaf onset frac (0=off unless set in PFT table; deciduous storage PFTs=0.5)
+        'has_storage_pool',  compiledValue(demand_ctx, 'has_storage_pool', 0), ...   % [E] onset-xfer needs a reserve pool
         'flivewd',           demand_ctx.pftP_demand.flivewd, ...          % [13c] new stem C fraction to live wood (computeCarbonAllocation)
-        'croot_stem',        vegetation.getPFTValue(demand_ctx.pftType, 'croot_stem', 0), ...   % [coarse-root-refill] coarse-root:stem ratio -> belowground reserve refill in computeCarbonAllocation (apple 0.225 Zanotelli 2013; 0=non-woody). MISSING before 2026-06-10 -> croot_stem silently 0 in v63/v64/v65.
-        'nsc_frac',          vegetation.getPFTValue(demand_ctx.pftType, 'nsc_frac', 0.07), ...   % [target-reserve 2026-06-10] woody NSC C-fraction; reserve target = nsc_frac x own wood (computeReserveTarget). Apple 0.131; forwarded here to avoid the croot_stem-trap (3-segment chain).
-        'lwtop',             vegetation.getPFTValue(demand_ctx.pftType, 'lwtop'), ...   % [13c] live->dead stem C turnover (mirror)
+        'croot_stem',        compiledValue(demand_ctx, 'croot_stem', 0), ...   % [coarse-root-refill] coarse-root:stem ratio -> belowground reserve refill in computeCarbonAllocation (apple 0.225 Zanotelli 2013; 0=non-woody). MISSING before 2026-06-10 -> croot_stem silently 0 in v63/v64/v65.
+        'nsc_frac',          compiledValue(demand_ctx, 'nsc_frac', 0.07), ...   % [target-reserve 2026-06-10] woody NSC C-fraction; reserve target = nsc_frac x own wood (computeReserveTarget). Apple 0.131; forwarded here to avoid the croot_stem-trap (3-segment chain).
+        'lwtop',             compiledValue(demand_ctx, 'lwtop'), ...   % [13c] live->dead stem C turnover (mirror)
         'SLA0',              demand_ctx.pftP_demand.SLA0, ...              % [peaklai] LAI=f(C_leaf) cap check (computeCarbonAllocation)
         'SLAm',              demand_ctx.pftP_demand.SLAm, ...              % [peaklai] SLA canopy gradient
         'laimx',             demand_ctx.pftP_demand.laimx, ...            % [peaklai] physiological peak LAI -> leaf alloc cap
-        'harvest_fraction',  vegetation.getPFTValue(demand_ctx.pftType, 'harvest_fraction'), ...   % [-] [v11] 采收 C 直接按比例扣 C_fruit (不用 CN 反推)
-        'winter_wheat_cn',   vegetation.getPFTValue(demand_ctx.pftType, 'winter_wheat_cn', 0), ...
-        'initial_seed_c',    vegetation.getPFTValue(demand_ctx.pftType, 'initial_seed_c', 3), ...
-        'resp_scheme',       vegetation.getPFTValue(demand_ctx.pftType, 'resp_scheme', 0), ...      % [resp-substrate EXP 2026-06-12] 0=none 1=bruhn 2=tc_mm 3=jones
-        'resp_Km',           vegetation.getPFTValue(demand_ctx.pftType, 'resp_Km', 2), ...          % [tc_mm] M-M half-saturation [g C/m2]
-        'resp_jones_kf',     vegetation.getPFTValue(demand_ctx.pftType, 'resp_jones_kf', 0.227), ...% [jones] fast-pool turnover [1/hr]
-        'resp_jones_Yg',     vegetation.getPFTValue(demand_ctx.pftType, 'resp_jones_Yg', 0.75), ... % [jones] growth yield
-        'xsmr_recovery_days',vegetation.getPFTValue(demand_ctx.pftType, 'xsmr_recovery_days', 30));
+        'harvest_fraction',  compiledValue(demand_ctx, 'harvest_fraction'), ...   % [-] [v11] 采收 C 直接按比例扣 C_fruit (不用 CN 反推)
+        'winter_wheat_cn',   compiledValue(demand_ctx, 'winter_wheat_cn', 0), ...
+        'initial_seed_c',    compiledValue(demand_ctx, 'initial_seed_c', 3), ...
+        'resp_scheme',       compiledValue(demand_ctx, 'resp_scheme', 0), ...      % [resp-substrate EXP 2026-06-12] 0=none 1=bruhn 2=tc_mm 3=jones
+        'resp_Km',           compiledValue(demand_ctx, 'resp_Km', 2), ...          % [tc_mm] M-M half-saturation [g C/m2]
+        'resp_jones_kf',     compiledValue(demand_ctx, 'resp_jones_kf', 0.227), ...% [jones] fast-pool turnover [1/hr]
+        'resp_jones_Yg',     compiledValue(demand_ctx, 'resp_jones_Yg', 0.75), ... % [jones] growth yield
+        'xsmr_recovery_days',compiledValue(demand_ctx, 'xsmr_recovery_days', 30));
     pftP_carbon.resp_night_hours = NitrogenVariables.resp_night_hours;   % [resp-substrate EXP] bruhn h (this step)
-    pftP_carbon.labile_resp_days = vegetation.getPFTValue(demand_ctx.pftType, 'labile_resp_days', 1.0);   % [labile floor 2026-06-14] [d] soluble-sugar working-pool residence (computeLabileSugarTarget)
-    pftP_carbon.C_labile_abs_min = vegetation.getPFTValue(demand_ctx.pftType, 'C_labile_abs_min', 0.01);  % [labile floor 2026-06-14] [g C/m2] small nonzero floor
+    pftP_carbon.labile_resp_days = compiledValue(demand_ctx, 'labile_resp_days', 1.0);   % [labile floor 2026-06-14] [d] soluble-sugar working-pool residence (computeLabileSugarTarget)
+    pftP_carbon.C_labile_abs_min = compiledValue(demand_ctx, 'C_labile_abs_min', 0.01);  % [labile floor 2026-06-14] [g C/m2] small nonzero floor
+    if pftP_carbon.winter_wheat_cn == 1
+        pftP_carbon.CN_leaf_grainfill = compiledValue(demand_ctx,'CN_leaf_grainfill');
+        pftP_carbon.CN_stem_grainfill = compiledValue(demand_ctx,'CN_stem_grainfill');
+        pftP_carbon.CN_root_grainfill = compiledValue(demand_ctx,'CN_root_grainfill');
+    end
 
     % ------------------------------------------------------------
     % Step 5: NSC 联动 C alloc (cap + overdraft + storage_drawdown 诊断)
@@ -266,6 +289,29 @@ function [NitrogenVariables, R_a_plant_kg] = runPlantCNStep( ...
     %   (higher after summer starch-only C refill, lower after autumn N resorption), not a target.
     %   The growing-season C reserve refill carries no matching N inflow on purpose: it is
     %   carbohydrate (starch), which is N-free.
+    if pftP_carbon.winter_wheat_cn == 1
+        % The demand calculation and this step's respiration used accepted
+        % organ N. Newly remobilized N enters the mobile pool AFTER growth,
+        % and offsets soil uptake on the next step (CoLM explicit ordering).
+        % Phase is accepted by the same outer transaction as these C/N pools;
+        % retry repeats the same candidate, not a second accepted transfer.
+        pa = demand_ctx.phen_alloc;
+        ps = env_turn.phen_state;
+        if isfield(demand_ctx,'accepted_phen_alloc')
+            previousPhase = demand_ctx.accepted_phen_alloc.crop_phase;
+        else
+            previousPhase = pa.crop_phase;
+        end
+        enter_grain_fill = (isfield(ps,'crop_grainfill_event') && ps.crop_grainfill_event) ...
+            || (previousPhase < 3 && ps.crop_phase == 3 && ps.crop_live);
+        grainN = vegetation.nitrogen.winterWheatGrainNitrogen( ...
+            C_pools_prev,pools_prev,enter_grain_fill,pftP_carbon);
+        pools_new.N_leaf = pools_new.N_leaf - grainN.leaf;
+        pools_new.N_livestem = pools_new.N_livestem - grainN.stem;
+        pools_new.N_root_fine = pools_new.N_root_fine - grainN.root;
+        pools_new.N_labile = pools_new.N_labile + grainN.to_labile;
+        env_turn.C_fruit_after_allocation = C_pools_after_alloc.C_fruit;
+    end
     pools_turn_in = struct( ...
         'N_labile',     pools_new.N_labile, ...   % no fabricated C:N skim from labile into storage
         'N_leaf',       pools_new.N_leaf, ...
@@ -279,22 +325,22 @@ function [NitrogenVariables, R_a_plant_kg] = runPlantCNStep( ...
         'N_root_storage', NitrogenVariables.N_root_storage(idx_prev), ...
         'N_stem_storage', NitrogenVariables.N_stem_storage(idx_prev));
     pftP_turn = struct( ...
-        'harvest_fraction',      vegetation.getPFTValue(demand_ctx.pftType, 'harvest_fraction'), ...
-        'root_turnover_rate',    vegetation.getPFTValue(demand_ctx.pftType, 'root_turnover_rate'), ...
-        'spring_release_days',   vegetation.getPFTValue(demand_ctx.pftType, 'spring_release_days'), ...
-        'leaf_long_days',        vegetation.getPFTValue(demand_ctx.pftType, 'leaf_long_days'), ...
-        'ndays_off',             vegetation.getPFTValue(demand_ctx.pftType, 'ndays_off'), ...   % Phase D leaf senescence ramp
+        'harvest_fraction',      compiledValue(demand_ctx, 'harvest_fraction'), ...
+        'root_turnover_rate',    compiledValue(demand_ctx, 'root_turnover_rate'), ...
+        'spring_release_days',   compiledValue(demand_ctx, 'spring_release_days'), ...
+        'leaf_long_days',        compiledValue(demand_ctx, 'leaf_long_days'), ...
+        'ndays_off',             compiledValue(demand_ctx, 'ndays_off'), ...   % Phase D leaf senescence ramp
         'retransl_fraction',     pftP_carbon.retransl_fraction, ...
-        'f_storage_root',        vegetation.getPFTValue(demand_ctx.pftType, 'f_storage_root', 0.18), ...   % [resorbed-N split] root share of resorbed leaf N (Dong 2002; reserve root:stem partition)
-        'is_perennial',          vegetation.getPFTValue(demand_ctx.pftType, 'is_perennial'), ...
-        'has_fruit',             vegetation.getPFTValue(demand_ctx.pftType, 'has_fruit'), ...
-        'has_storage_pool',      vegetation.getPFTValue(demand_ctx.pftType, 'has_storage_pool'), ...
-        'lwtop',                 vegetation.getPFTValue(demand_ctx.pftType, 'lwtop'), ...   % [13c] live->dead stem turnover
-        'CN_lw',                 vegetation.getPFTValue(demand_ctx.pftType, 'CN_lw'), ...   % [13c]
-        'CN_dw',                 vegetation.getPFTValue(demand_ctx.pftType, 'CN_dw'));      % [13c]
-    pftP_turn.winter_wheat_cn = vegetation.getPFTValue(demand_ctx.pftType, 'winter_wheat_cn', 0);
-    pftP_turn.initial_seed_c = vegetation.getPFTValue(demand_ctx.pftType, 'initial_seed_c', 3);
-    pftP_turn.CN_L = vegetation.getPFTValue(demand_ctx.pftType, 'CN_L');
+        'f_storage_root',        compiledValue(demand_ctx, 'f_storage_root', 0.18), ...   % [resorbed-N split] root share of resorbed leaf N (Dong 2002; reserve root:stem partition)
+        'is_perennial',          compiledValue(demand_ctx, 'is_perennial'), ...
+        'has_fruit',             compiledValue(demand_ctx, 'has_fruit'), ...
+        'has_storage_pool',      compiledValue(demand_ctx, 'has_storage_pool'), ...
+        'lwtop',                 compiledValue(demand_ctx, 'lwtop'), ...   % [13c] live->dead stem turnover
+        'CN_lw',                 compiledValue(demand_ctx, 'CN_lw'), ...   % [13c]
+        'CN_dw',                 compiledValue(demand_ctx, 'CN_dw'));      % [13c]
+    pftP_turn.winter_wheat_cn = compiledValue(demand_ctx, 'winter_wheat_cn', 0);
+    pftP_turn.initial_seed_c = compiledValue(demand_ctx, 'initial_seed_c', 3);
+    pftP_turn.CN_L = compiledValue(demand_ctx, 'CN_L');
 
     [pools_turn_out, turn_diag, turn_state_out] = vegetation.integrated.turnoverAndHarvest( ...
         pools_turn_in, NitrogenVariables.turnover_state, pftP_turn, env_turn, Delt_t);
@@ -397,7 +443,7 @@ function [NitrogenVariables, R_a_plant_kg] = runPlantCNStep( ...
         && pftP_carbon.has_storage_pool == 1 && pftP_carbon.fstor2tran > 0;
     if use_onset
         DOY_o = demand_ctx.DOY_for_demand;
-        ndays_stor = vegetation.getPFTValue(demand_ctx.pftType, 'ndays_stor', 30);
+        ndays_stor = compiledValue(demand_ctx, 'ndays_stor', 30);
         if isnan(bb_doy) || DOY_o < bb_doy
             NitrogenVariables.onset_mobilized_flag = false;   % re-arm one-shot before budburst
         end
@@ -479,7 +525,7 @@ function [NitrogenVariables, R_a_plant_kg] = runPlantCNStep( ...
     % CLM5 FruitTree: deadstemc_soy captured Jan 1; at autumn offset prune prune_fr of the
     %   annual deadstem increment (deadstemc - deadstemc_soy) to litter (mulch_pruning=1).
     %   CNPhenologyMod.F90:1675 (soy capture) + CNCStateUpdate1Mod.F90:304-307 (deadstem->litter).
-    prune_fr = vegetation.getPFTValue(demand_ctx.pftType, 'prune_fr', 0);
+    prune_fr = compiledValue(demand_ctx, 'prune_fr', 0);
     if prune_fr > 0
         DOY_p = demand_ctx.DOY_for_demand;
         if DOY_p <= 1   % year start: capture deadstem at start of year, re-arm one-shot prune
@@ -512,7 +558,7 @@ function [NitrogenVariables, R_a_plant_kg] = runPlantCNStep( ...
     %   perennial woody pools at steady state. Applied to live+dead stem and live+dead coarse root;
     %   C and N at the SAME fraction (C:N preserved). Removed C/N -> cum_C_mortality/cum_N_mortality,
     %   summed into plant_c/n_residual in COMPASS.m like the other litter outflows (conservation).
-    r_mort_p = vegetation.getPFTValue(demand_ctx.pftType, 'r_mort', 0);
+    r_mort_p = compiledValue(demand_ctx, 'r_mort', 0);
     if r_mort_p > 0
         m_frac = r_mort_p * Delt_t / 31536000;   % [-] annual fraction -> per dt
         woodC = {'C_livestem','C_deadstem','C_livecroot','C_deadcroot'};
@@ -532,3 +578,19 @@ end
 
 % Change: 2026-09-02 Jizixing Zhu -- keep crop cleanup respiration
 % nonnegative and ledger xsmr debt writeoff separately for exact closure.
+
+function value = compiledValue(ctx, key, varargin)
+% Production parameters were resolved once by init.buildPlantCNParams.
+% Direct historical kernel fixtures without that contract retain PFT lookup.
+    if isfield(ctx,'plant_cn_params')
+        assert(isfield(ctx.plant_cn_params.resolved,key), ...
+            'runPlantCNStep:missingCompiledParameter','Missing compiled plant C/N parameter %s.',key);
+        value = ctx.plant_cn_params.resolved.(key);
+    else
+        value = vegetation.getPFTValue(ctx.pftType,key,varargin{:});
+    end
+end
+
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

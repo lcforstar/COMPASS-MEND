@@ -12,11 +12,23 @@ function model = stageWaterUptake(model)
 %   The staged `root_soil_exchange` is the typed vegetation-to-soil request;
 %   it is not an independently owned soil-water state.
 %   Editor: Jizixing Zhu; Date: 2026-07-16.
+% Change: 2026-09-30 Wenjie Liu -- zero annual crop uptake on the current
+% harvest/fallow candidate, including hydraulic redistribution.
     scope_step = model.built.workspace.scope_step;
     n_layers = model.built.domain.NL;
     n_nodes = model.built.domain.NN;
     switches = model.built.control.switches;
-    if readField(switches, 'lRwuef', 0) ~= 1
+    cropInactive = false;
+    if vegetation.getPFTValue(model.built.parameters.veg.structure.PFT_type, ...
+            'winter_wheat_cn',0)==1
+        phen = model.built.Y.vegetation.phenology;
+        if isfield(scope_step,'phenology_candidate')
+            phen = scope_step.phenology_candidate;
+        end
+        cropInactive = ~phen.state.crop_live || phen.state.crop_phase < 2 ...
+            || scope_step.canopy.LAI <= 0;
+    end
+    if readField(switches, 'lRwuef', 0) ~= 1 || cropInactive
         scope_step.RWU = zeros(n_nodes, 1);
         exchange = coupling.solveRootSoilExchange( ...
             scope_step.RWU, n_layers);

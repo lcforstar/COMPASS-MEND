@@ -47,6 +47,9 @@ function [pools_out, diag, state_out] = turnoverAndHarvest( ...
 %     cn_coupling_path_and_literature_audit.md §7 (M2-B.4 plan)
 %
 %   Author: Zhu Jizixing 2026-05-21 (M2-B.4 S2.5)
+% Change: 2026-09-30 Wenjie Liu -- annual crop harvest is one-shot, pairs
+%   retained seed C/N, and accounts for remaining mobile/storage N in the
+%   existing Changwu shoot-removal/root-litter management ledger.
 
     % --- Init outputs ---
     pools_out = pools_in;
@@ -59,7 +62,8 @@ function [pools_out, diag, state_out] = turnoverAndHarvest( ...
     state_out = state_in;
 
     if isfield(pftParams, 'winter_wheat_cn') && pftParams.winter_wheat_cn == 1
-        [pools_out, diag] = winterWheatTurnoverN(pools_out, diag, pftParams, env);
+        [pools_out, diag, state_out] = winterWheatTurnoverN( ...
+            pools_out, diag, state_out, pftParams, env);
         return;
     end
 
@@ -245,25 +249,54 @@ function [pools_out, diag, state_out] = turnoverAndHarvest( ...
     % same reserve in overlapping spring windows). diag fields stay 0 (no C-mirror release).
 end
 
-function [p, d] = winterWheatTurnoverN(p, d, prm, env)
+function [p, d, state] = winterWheatTurnoverN(p, d, state, prm, env)
 % CoLM crop onset/offset adapter. Grain retained for the next 3 gC m-2 seed;
 % Change: 2026-09-09 Jizixing Zhu -- Changwu NM/NPM management (Su Fuyuan
 % thesis pp.15-16): remaining grain and all standing shoots leave the field;
 % roots enter belowground litter. Harvest ledger includes straw, not grain only.
 ps = env.phen_state;
+% Daily phenology flags can persist over several hourly steps. Keep the
+% applied harvest latch in the existing accepted turnover state, and rearm
+% only in the next live pre-grain crop (not at the calendar-year boundary).
+if (isfield(ps,'crop_planting_event') && ps.crop_planting_event) ...
+        || (isfield(ps,'crop_live') && ps.crop_live ...
+            && isfield(ps,'crop_phase') && ps.crop_phase < 3)
+    state.harvested_this_year = 0;
+end
+already_harvested = isfield(state,'harvested_this_year') && state.harvested_this_year;
 d.crop_emergence_event = isfield(ps, 'crop_emergence_event') && ps.crop_emergence_event;
-d.crop_harvest_event = isfield(ps, 'crop_harvest_event') && ps.crop_harvest_event;
+d.crop_harvest_event = isfield(ps, 'crop_harvest_event') && ps.crop_harvest_event ...
+    && ~already_harvested;
 if isfield(ps, 'crop_emergence_event') && ps.crop_emergence_event
     p.N_leaf = p.N_leaf + p.N_fruit;
     p.N_fruit = 0;
 end
-if ~isfield(ps, 'crop_harvest_event') || ~ps.crop_harvest_event
+if ~d.crop_harvest_event
     return;
 end
-seedN = min(p.N_fruit, prm.initial_seed_c / prm.CN_L);
-d.harvest_today = p.N_fruit - seedN + p.N_leaf + p.N_livestem + p.N_deadstem;
+assert(isfield(env,'C_fruit_after_allocation') ...
+    && isscalar(env.C_fruit_after_allocation) ...
+    && isfinite(env.C_fruit_after_allocation) && env.C_fruit_after_allocation >= 0, ...
+    'turnoverAndHarvest:missingCropGrainCarbon', ...
+    'Crop seed retention requires the same-step physical grain carbon.');
+assert(isscalar(prm.CN_L) && isfinite(prm.CN_L) && prm.CN_L > 0 ...
+    && isscalar(prm.initial_seed_c) && isfinite(prm.initial_seed_c) ...
+    && prm.initial_seed_c >= 0, 'turnoverAndHarvest:invalidCropSeed', ...
+    'Crop seed C amount and C:N must be finite and physically valid.');
+d.crop_seed_carbon = min([prm.initial_seed_c, ...
+    env.C_fruit_after_allocation, p.N_fruit * prm.CN_L]);
+seedN = d.crop_seed_carbon / prm.CN_L;
+% COMPASS management adaptation, NOT a claimed CoLM retransn reset:
+% the crop's unallocated mobile N and aboveground reserve leave with the
+% removed shoots; any belowground reserve joins root residue. Every amount
+% is debited and entered in an existing physical export/litter ledger.
+d.harvest_today = p.N_fruit - seedN + p.N_leaf + p.N_livestem + ...
+    p.N_deadstem + p.N_labile + p.N_stem_storage;
 d.leaf_litter_today = 0;
-d.root_litter_today = p.N_root_fine + p.N_livecroot + p.N_deadcroot;
+d.root_litter_today = p.N_root_fine + p.N_livecroot + p.N_deadcroot + p.N_root_storage;
+p.N_labile = 0;
+p.N_root_storage = 0;
+p.N_stem_storage = 0;
 p.N_leaf = 0;
 p.N_root_fine = 0;
 p.N_livestem = 0;
@@ -271,4 +304,12 @@ p.N_deadstem = 0;
 p.N_livecroot = 0;
 p.N_deadcroot = 0;
 p.N_fruit = seedN;
+state.harvested_this_year = 1;
 end
+
+% Change: 2026-09-30 Wenjie Liu -- harvest explicit standing senescent
+% leaf N through the existing standing-shoot export ledger, once per crop.
+% CoLM crop onset/offset adapter. Grain retained for the next 3 gC m-2 seed;
+% Change: 2026-09-30 Wenjie Liu -- withdraw this round's APSIM stem WSC
+%   and standing-senescent-leaf extension; retain the original COMPASS litter
+%   and CoLM crop C/N allocation/harvest contracts. Earlier Change records are historical.

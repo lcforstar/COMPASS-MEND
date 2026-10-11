@@ -22,6 +22,8 @@ function file = saveCompassCheckpoint(model, kt)
 %     file  [char]  full path of the written .mat (contains a single `ckpt` struct).
 %
 %   Editor: Jizixing Zhu; Date: 2026-07-01.
+%   Change: 2026-09-29 Wenjie Liu -- retain actual DIN observation parameters
+%     so sample scoring cannot silently use baseline adsorption capacity.
 %   Change: 2026-07-05 Jizixing Zhu -- stop serializing runtime.snow; SWE now lives in Y.snow (prognostic) and rides ckpt.Y whole-store (state-ownership migration).
 %   Change: 2026-07-05 Jizixing Zhu -- doc: Y.surface.Tss now rides ckpt.Y (increment 2); previously runtime.thermal was never serialized (Tss lost on resume) -- gap now fixed.
 %   Change: 2026-07-08 Jizixing Zhu -- doc: Y.surface.Ts also rides ckpt.Y as the accepted SCOPE/ebal thermal.Ts carry.
@@ -53,6 +55,9 @@ function ckpt = buildCheckpoint(model, kt)
 % Editor: Jizixing Zhu; Date: 2026-09-15.
 % Change: 2026-09-15 Jizixing Zhu -- retain accepted root-water history used
 % by the next outer-step predictor (bottom-up layer endpoints, s^-1).
+% Change: 2026-09-30 Wenjie Liu -- retain the two accepted surface fluxes
+% consumed by the next abrupt-wetting predictor; they are causal memory,
+% not reconstructible transport coefficients or diagnostic-only records.
     rt = model.runtime;
     ckpt = struct();
     ckpt.schema_version = 2;
@@ -61,11 +66,27 @@ function ckpt = buildCheckpoint(model, kt)
 
     ckpt.Y = model.built.Y;
     ckpt.compatibility = io.checkpointCompatibilitySignature(model.built);
+    if isfield(model.built.parameters,'soil_n')
+        p=model.built.parameters.soil_n;
+        ckpt.din_observation_contract=struct('schema_version',1, ...
+            'dz_cm',model.built.domain.dz(:), ...
+            'RHO_bulk',p.RHO_bulk(:),'RHOKG',p.RHOKG(:), ...
+            'observable','dissolved_plus_equilibrium_adsorbed');
+    end
     rootWater = model.built.workspace.flux.Srt;
     assert(all(isfinite(rootWater(:))), ...
         'saveCompassCheckpoint:rootWaterHistory', 'Root-water history must be finite.');
     ckpt.coupling_memory = struct('completed_kt',kt, ...
         'root_water_element_endpoint_rate_1_s',rootWater);
+    flux=model.built.workspace.flux;
+    for name={'Throughfall','EVAP'}
+        value=flux.(name{1});
+        assert(isnumeric(value)&&isscalar(value)&&isreal(value)&&isfinite(value), ...
+            'saveCompassCheckpoint:surfaceWaterHistory', ...
+            'Accepted surface-water history %s must be a finite real scalar [cm/s].',name{1});
+    end
+    ckpt.coupling_memory.surface_water_history=struct( ...
+        'throughfall_cm_s',flux.Throughfall,'evap_cm_s',flux.EVAP);
 
     ckpt.runtime = struct();
     ckpt.runtime.step        = rt.step;
@@ -82,4 +103,16 @@ function ckpt = buildCheckpoint(model, kt)
     % in Y.plant_acclimation -> ride ckpt.Y whole-store; runtime owns no LUNA field (2026-07-06 increment 6b).
     ckpt.runtime.groundwater = rt.groundwater;
     ckpt.runtime.management  = rt.management;                % fertilizer once-only state (serializable)
+    % Change: 2026-09-29 Wenjie Liu -- persist optional replay seam memory
+    % alongside its authoritative accepted runtime.step clock.
+    if isfield(rt,'biogeochemistry_cycle')
+        assert(rt.step.KT==kt,'saveCompassCheckpoint:cycleClock', ...
+            'Replay context must be saved at its actual accepted KT.');
+        init.validateBiogeochemistryCycleContext(rt.biogeochemistry_cycle,model.built,kt);
+        ckpt.runtime.biogeochemistry_cycle=rt.biogeochemistry_cycle;
+    end
+    if isfield(rt,'biogeochemistry_spinup_identity')
+        ckpt.runtime.biogeochemistry_spinup_identity=rt.biogeochemistry_spinup_identity;
+        ckpt.runtime.biogeochemistry_spinup_cycle_steps=rt.biogeochemistry_spinup_cycle_steps;
+    end
 end

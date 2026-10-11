@@ -27,6 +27,8 @@ function vegState = buildVegState(built, veg, raw)
 % Change: 2026-07-16 Jizixing Zhu -- name the measured canopy input explicitly.
 % Change: 2026-08-24 Jizixing Zhu -- retain the temperature phenology driver
 %   for PlantCN even when canopy LAI is observation-driven.
+% Change: 2026-09-30 Wenjie Liu -- compile observed green-LAI harvest edges
+%   as explicit forcing and anchor annual heat-unit arrays to calendar dates.
 
     if nargin < 3
         raw = struct();
@@ -34,6 +36,7 @@ function vegState = buildVegState(built, veg, raw)
     vegState = struct();
     vegState.phen_driver = buildPhenDriver(built, veg);        % V3
     vegState.lai_state   = buildLaiState(built, veg, raw);     % V4
+    vegState.crop_lifecycle = buildCropLifecycleForcing(veg,vegState.lai_state);
 end
 
 % ===========================================================================
@@ -230,14 +233,40 @@ function pd = buildPhenDriver(built, veg)
     end
     [Tmax, Tmin] = phenologyDailyTemperatureRange(built);
     ph   = veg.phenology;
+    forcingStart = built.control.time.start_time;
+    if isfield(built.control.time,'forcing_start_clock')
+        forcingStart = built.control.time.forcing_start_clock;
+    end
+    pd.forcing_start_time = forcingStart;
+    calendarArgs = {};
+    if vegetation.getPFTValue(veg.structure.PFT_type,'winter_wheat_cn',0)==1
+        calendarArgs = {dateshift(forcingStart,'start','day') + days((0:numel(Tmax)-1)')};
+    end
 
     [pd.phen_CHU, pd.phen_HU, pd.phen_HUI, ~, ~, ~, pd.phen_dHUF] = ...
         vegetation.phenology.CalculateHeatUnit(Tmax, Tmin, ph.sowing_day, ph.T_BASE, ph.PHU, ...
-            ph.FRGW1, ph.LAIMX1, ph.FRGW2, ph.LAIMX2);
+            ph.FRGW1, ph.LAIMX1, ph.FRGW2, ph.LAIMX2,calendarArgs{:});
 
     pd.phen_Tavg_daily = (Tmax + Tmin) / 2;     % daily mean T (phenology dispatcher)
     pd.phen_Tmin_daily = Tmin;                  % daily Tmin (Cesaraccio chilling)
     pd.phen_Tmax_daily = Tmax;                  % daily Tmax
+end
+
+function forcing = buildCropLifecycleForcing(veg,laiState)
+% Compile only prescribed green-area forcing; do not alter observations.
+% Exact positive-to-zero edges implement the selected management proxy.
+% Editor: Wenjie Liu; Date: 2026-09-30.
+    rule = 'thermal_maturity';
+    if isfield(veg.phenology,'crop_harvest_rule'), rule = veg.phenology.crop_harvest_rule; end
+    forcing = struct('harvest_rule',rule,'harvest_event',false(size(laiState.LAI)), ...
+        'green_present',laiState.LAI>0,'green_lai',laiState.LAI, ...
+        'source','configured_canopy_green_LAI','units','m2 leaf per m2 ground');
+    if strcmp(rule,'observed_lai_zero')
+        greenLai = laiState.LAI(:);
+        assert(all(isfinite(greenLai)) && all(greenLai>=0), ...
+            'buildVegState:badObservedGreenLai','Observed green LAI must be finite and nonnegative.');
+        forcing.harvest_event = [false;greenLai(1:end-1)>0 & greenLai(2:end)==0];
+    end
 end
 
 % ===========================================================================

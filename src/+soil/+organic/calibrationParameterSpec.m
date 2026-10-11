@@ -4,12 +4,17 @@ function spec=calibrationParameterSpec()
 %   Returns a table; it does not mutate parameters or invoke an optimizer.
 %   Water and inorganic-N parameters are deliberately absent because they are
 %   treated as frozen prerequisites for this calibration sequence.
-%   Stage 4 lists scalar independent MEND configuration inputs. Derived Vm,
+%   Stage 4 lists site-global MEND configuration inputs. Derived Vm,
 %   rMORT and VmD and the three-component input-fraction vector are excluded.
 %
 %   Editor: Jizixing Zhu; Date: 2026-09-02.
 % Change: 2026-09-14 Codex -- replace retired MEMC keys with independent
 %   hourly MEND inputs consumed by init.buildSoilMicrobes.
+% Change: 2026-09-29 Wenjie Liu -- mark the four carbon kinetic profiles as
+%   soil-owned. Candidate listing does not override active solver restrictions.
+% Change: 2026-10-11 Wenjie Liu -- restore the four Changwu MEND kinetic
+%   traits to site-global ownership; depth-resolved DOM sorption/transport
+%   remains soil-owned.
     mendNames=["active_fraction_initial";"mend_lci_initial"; ...
         "mend_vd_pom_h";"mend_ks_pom1_mg_g";"mend_ks_pom_ratio"; ...
         "mend_enzyme_turnover_h";"mend_penzp";"mend_penzm_ratio"; ...

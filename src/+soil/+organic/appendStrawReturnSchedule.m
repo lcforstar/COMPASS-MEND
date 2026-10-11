@@ -9,6 +9,8 @@ function schedule=appendStrawReturnSchedule(schedule,config,enabled)
 %
 % Editor: Jizixing Zhu; Date: 2026-08-28.
 % Change: 2026-08-30 Codex -- append explicit zero-TAN fields for straw.
+% Change: 2026-10-10 Wenjie Liu -- append unit mixing entries under the
+%   uniform-depth placement contract shared with direct manure events.
 
     if ~enabled||~isfield(config,'straw_return'), return; end
     s=config.straw_return;
@@ -40,6 +42,10 @@ function schedule=appendStrawReturnSchedule(schedule,config,enabled)
         'Straw carbon, C:N, placement, or depths are invalid.');
 
     carbon=carbonKg.*1e-5; nitrogen=carbon./cn;
+    if ~isfield(schedule,'mixing_efficiency')
+        schedule.mixing_efficiency=ones(1,numel(schedule.time));
+    end
+    schedule.mixing_efficiency=[schedule.mixing_efficiency,ones(1,n)];
     % The staging adapter ignores legacy three-pool splits: material identity
     % selects the native straw AOM rate kernel after the event is accepted.
     schedule.time=[schedule.time,times(:).'];

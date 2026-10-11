@@ -93,6 +93,12 @@ function [model, outcome] = attemptSolveSoilEquations(model, kt, dt, solveCtl)
 %       retains its finite-depth DSTOR reservoir and uses the same
 %       complementarity structure without adopting Nitsche or mixed FEM.
 %   Editor: Jizixing Zhu; Date: 2026-07-07.
+%   Change: 2026-10-07 Wenjie Liu -- hand each block line-search candidate's
+%           refreshed coefficient pair directly to the exact ledger owner;
+%           preserve the original candidate and every physical acceptance gate.
+%   Change: 2026-10-01 Wenjie Liu -- reject an ill-conditioned frozen
+%           h/U/M_a block through the existing rollback/substep retry path;
+%           preserve condition, physical acceptance and bad-input gates.
 %   Change: 2026-07-08 Jizixing Zhu -- WBC-2: return the converged tile waterFlux in outcome for the hourly accumulator.
 %   Change: 2026-07-09 Jizixing Zhu -- I4: wire Anderson apply(KIT>1)/commit into the water Picard (legacy COMPASS.m:1665-1675,1883-1887) via the A4 setup; marshal trial.{h,T} through pack/unpack; outcome.anderson stats; lAnderson default true.
 %   Change: 2026-07-09 Jizixing Zhu -- add candidate actual-mass residual telemetry and gating.
@@ -481,8 +487,10 @@ function [model, outcome] = attemptSolveSoilEquations(model, kt, dt, solveCtl)
                 blockPicardRequested);
         catch err
             if strcmp(err.identifier, ...
-                    'solveLaggedPicardBlock:singularBlockPivot')
-                % A singular frozen Picard pivot invalidates only this trial.
+                    'solveLaggedPicardBlock:singularBlockPivot') ...
+                    || strcmp(err.identifier, ...
+                    'solveLaggedPicardMassBlock:singularSystem')
+                % A singular frozen Picard system invalidates only this trial.
                 % Return a normal rejection so the outer scheduler can roll
                 % back the snapshot and retry with a smaller substep.
                 terminationReason = 'singular_block_pivot';
@@ -1652,8 +1660,11 @@ function [built, result, airRelaxation] = solvePressureBlockPicardMap( ...
         if ~trialAir.admissible
             continue;
         end
+        prepared = struct('schema_version', 1, ...
+            'source_candidate', candidate, 'candidate', candidateCheck, ...
+            'equations', candidateEquations, 'refresh_opts', refreshOpts);
         trialExact = soil.coupling.evaluateResidualLedger( ...
-            candidate, context);
+            candidate, context, prepared);
         armijoSlack = 1e-12 * max(1, phiBefore);
         sufficientDecrease = trialExact.merit.phi ...
             <= (1 - 1e-4 * alpha) * phiBefore + armijoSlack;
@@ -1861,7 +1872,11 @@ function [built, result, airRelaxation] = solveMassBlockPicardMap( ...
         if ~trialAir.admissible
             continue;
         end
-        trialExact = soil.coupling.evaluateResidualLedger(candidate, context);
+        prepared = struct('schema_version', 1, ...
+            'source_candidate', candidate, 'candidate', candidateCheck, ...
+            'equations', candidateEquations, 'refresh_opts', refreshOpts);
+        trialExact = soil.coupling.evaluateResidualLedger( ...
+            candidate, context, prepared);
         armijoSlack = 1e-12 * max(1, phiBefore);
         sufficientDecrease = trialExact.merit.phi ...
             <= (1 - 1e-4 * alpha) * phiBefore + armijoSlack;

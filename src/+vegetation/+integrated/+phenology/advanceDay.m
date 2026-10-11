@@ -30,10 +30,13 @@ function phen = advanceDay(phen, phenDriver, pftType, ts, startTime, latDeg, sit
 %   Change: 2026-07-05 Jizixing Zhu — doc: phen arg is Y.vegetation.phenology (was runtime.phenology); ownership migration increment 5. Body unchanged.
 %   Change: 2026-08-24 Jizixing Zhu -- index daily forcing by elapsed model
 %           day so simulations starting after January 1 remain clock-aligned.
+% Change: 2026-09-30 Wenjie Liu -- use the actual forcing-clock anchor and
+%   carry the selected crop harvest rule into the winter-wheat kernel.
     if nargin < 7 || isempty(sitePhenology), sitePhenology = struct(); end
     doy    = day(ts, 'dayofyear');
     yr     = year(ts);
-    dayIdx = floor(days(ts - startTime)) + 1;       % one-based elapsed forcing day
+    forcingStart = readField(phenDriver,'forcing_start_time',startTime);
+    dayIdx = floor(days(ts - dateshift(forcingStart,'start','day'))) + 1;
 
     % Year boundary: reset the running max monthly-mean temperature (season_decid).
     if yr ~= phen.year
@@ -46,7 +49,7 @@ function phen = advanceDay(phen, phenDriver, pftType, ts, startTime, latDeg, sit
     phen.year_mtemp_max = max(phen.year_mtemp_max, mtemp);
 
     forcing = struct('T_avg', Tavg, 'Tmin', Tmin, 'Tmax', Tmax, ...
-                     'dayl_h', dayLength(latDeg, doy), 'mtemp', mtemp, ...
+                     'dayl_h', vegetation.dayLengthHours(latDeg, doy), 'mtemp', mtemp, ...
                      'latitude_deg', latDeg, 'water_stress', 0);
 
     [phen.state, ~] = vegetation.integrated.phenology.phenologyDispatch( ...
@@ -84,16 +87,6 @@ function mtemp = runningMonthlyMean(pd, dayIdx, Tavg)
 end
 
 % ---------------------------------------------------------------------------
-function h = dayLength(latDeg, doy)
-% Daylength [h] from solar declination (legacy 1331-1335).
-% Editor: Jizixing Zhu; Date: 2026-07-02.
-    latRad = deg2rad(latDeg);
-    decl   = deg2rad(23.45) * sin(2*pi/365 * (doy - 81));
-    cosOmega = min(1, max(-1, -tan(latRad) * tan(decl)));
-    h = 24/pi * acos(cosOmega);
-end
-
-% ---------------------------------------------------------------------------
 function p = phenPftParams(pftType, sitePhenology, phenDriver, startTime, latDeg)
 % PFT phenology parameters from the PFT table (legacy 1340-1357).
 % Editor: Jizixing Zhu; Date: 2026-07-02.
@@ -127,6 +120,7 @@ function p = phenPftParams(pftType, sitePhenology, phenDriver, startTime, latDeg
         'grnfill',                  g('grnfill', 1), ...
         'mxmat',                    g('mxmat', 365), ...
         'sowing_day',               readField(sitePhenology, 'sowing_day', 1), ...
+        'crop_harvest_rule',         readField(sitePhenology, 'crop_harvest_rule', 'thermal_maturity'), ...
         'gdd1020',                  cropGdd1020(phenDriver, startTime, latDeg));
 end
 
@@ -141,7 +135,8 @@ function gdd1020 = cropGdd1020(pd, startTime, latDeg)
 gdd1020 = 0;
 if ~isfield(pd, 'phen_Tavg_daily') || isempty(pd.phen_Tavg_daily), return; end
 t = pd.phen_Tavg_daily(:);
-dates = startTime + days((0:numel(t)-1)');
+forcingStart = readField(pd,'forcing_start_time',startTime);
+dates = dateshift(forcingStart,'start','day') + days((0:numel(t)-1)');
 if latDeg >= 0
     active = month(dates) >= 4 & month(dates) <= 9;
 else
