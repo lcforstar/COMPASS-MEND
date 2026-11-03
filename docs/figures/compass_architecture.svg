@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 880" font-family="Arial, sans-serif">
+  <defs>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#333"/></marker>
+    <marker id="ar-b" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1e66bf"/></marker>
+    <marker id="ar-r" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#c0392b"/></marker>
+    <marker id="ar-g" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#27ae60"/></marker>
+    <marker id="ar-pur" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#7e57c2"/></marker>
+
+    <linearGradient id="atm" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#dcecff"/><stop offset="100%" stop-color="#a5c8ee"/>
+    </linearGradient>
+    <linearGradient id="cnp" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#cae8c1"/><stop offset="100%" stop-color="#76b572"/>
+    </linearGradient>
+    <linearGradient id="soi" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c79170"/><stop offset="100%" stop-color="#7c4a26"/>
+    </linearGradient>
+    <linearGradient id="solver" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ede0fb"/><stop offset="100%" stop-color="#c8b3e9"/>
+    </linearGradient>
+    <linearGradient id="gw" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5cabe6"/><stop offset="100%" stop-color="#1e5fa8"/>
+    </linearGradient>
+    <linearGradient id="quad-sun" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffe082"/><stop offset="100%" stop-color="#ffc933"/>
+    </linearGradient>
+    <linearGradient id="quad-sha" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a4c2f4"/><stop offset="100%" stop-color="#6d9eeb"/>
+    </linearGradient>
+    <linearGradient id="novelty" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff7d6"/><stop offset="100%" stop-color="#ffe69e"/>
+    </linearGradient>
+
+    <style><![CDATA[
+      .title    { font: bold 22px Arial; fill: #1a1a1a; }
+      .subtitle { font: 12px Arial; fill: #555; font-style: italic; }
+      .layer-h  { font: bold 13px Arial; fill: #ffffff; }
+      .layer-h-d{ font: bold 13px Arial; fill: #0e3b6e; }
+      .panel-t  { font: bold 13px Arial; fill: #1f3d1f; }
+      .item     { font: 11px Arial; fill: #1f1f1f; }
+      .nov      { font: bold 11px Arial; fill: #7d4506; }
+      .arrow-l  { font: 10px Arial; fill: #333; }
+    ]]></style>
+  </defs>
+
+  <!-- ===== Title ===== -->
+  <text x="750" y="32" text-anchor="middle" class="title">COMPASS — Coupled Open Multiphysics Platform for Atmosphere–Soil Systems</text>
+  <text x="750" y="54" text-anchor="middle" class="subtitle">A process-based land system model for coupled energy, water, carbon, and nitrogen dynamics · v30</text>
+
+  <!-- ===== KEY NOVELTY BANNER (top-right) ===== -->
+  <rect x="990" y="68" width="490" height="74" rx="6" fill="url(#novelty)" stroke="#cc8800" stroke-width="2"/>
+  <text x="1235" y="84" text-anchor="middle" font-weight="bold" font-size="12" fill="#7d4506">★ COMPASS Distinguishing Features ★</text>
+  <g class="item" fill="#5c3e0a" font-size="10">
+    <text x="1000" y="100">① Four-quadrant canopy water     ② Two-leaf SPAC + Weibull P₅₀</text>
+    <text x="1000" y="118">③ Deep-profile soil (Loess vadose zone)</text>
+    <text x="1000" y="135">④ Synchronous biogeochemistry ⇄ physical-transport coupling</text>
+  </g>
+
+  <!-- ===== [1] ATMOSPHERIC FORCING ===== -->
+  <rect x="30" y="148" width="940" height="58" fill="url(#atm)" stroke="#3d7ec7" stroke-width="1.5" rx="6"/>
+  <text x="50" y="170" class="layer-h-d">[1]  Atmospheric Forcing</text>
+  <text x="50" y="192" class="item" fill="#0e3b6e">Radiation · Ta · RH · Wind · Pa · CO₂ · Precipitation · Bottom Tg</text>
+
+  <!-- ARROWS atm → canopy : labels OFFSET to side, not under arrow -->
+  <g stroke-width="2" fill="none">
+    <line x1="220" y1="206" x2="220" y2="248" stroke="#1e66bf" marker-end="url(#ar-b)"/>
+    <line x1="510" y1="206" x2="510" y2="248" stroke="#1e66bf" marker-end="url(#ar-b)"/>
+    <line x1="800" y1="206" x2="800" y2="248" stroke="#c0392b" marker-end="url(#ar-r)"/>
+  </g>
+  <g class="arrow-l">
+    <text x="158" y="231" fill="#1e66bf">radiation</text>
+    <text x="448" y="231" fill="#1e66bf">Ta · q · u</text>
+    <text x="743" y="231" fill="#c0392b">precip</text>
+  </g>
+
+  <!-- ===== [2] CANOPY ===== -->
+  <rect x="30" y="248" width="940" height="252" fill="url(#cnp)" stroke="#2f6c2f" stroke-width="1.5" rx="6"/>
+  <text x="50" y="271" class="layer-h">[2]  Vegetation &amp; Canopy</text>
+
+  <!-- 2a -->
+  <rect x="50" y="285" width="280" height="200" rx="8" fill="rgba(255,255,255,0.97)" stroke="#2f6c2f" stroke-width="1.5"/>
+  <text x="190" y="307" text-anchor="middle" class="panel-t">Radiative Transfer + Phenology</text>
+  <line x1="62" y1="316" x2="318" y2="316" stroke="#2f6c2f" stroke-width="0.4"/>
+  <g class="item">
+    <text x="62" y="338">RTMo · RTMt · RTMf · RTMz</text>
+    <text x="62" y="362">Norman 1979 sun / shade split</text>
+    <text x="62" y="386">Phenology  GDD → LAI(t)</text>
+  </g>
+  <text x="62" y="460" class="item" fill="#666" font-style="italic">→ aPAR, Rₙ_c, Rₙ_s, Pₛ(z)</text>
+
+  <!-- 2b -->
+  <rect x="345" y="285" width="280" height="200" rx="8" fill="rgba(255,255,255,0.97)" stroke="#2f6c2f" stroke-width="1.5"/>
+  <text x="485" y="307" text-anchor="middle" class="panel-t">Energy + Carbon + SPAC</text>
+  <line x1="357" y1="316" x2="613" y2="316" stroke="#2f6c2f" stroke-width="0.4"/>
+  <g class="item">
+    <text x="357" y="338">CLM4.5 energy balance</text>
+    <text x="357" y="362">FvCB photosynthesis + Medlyn gs</text>
+  </g>
+  <!-- novelty box inside 2b -->
+  <rect x="357" y="378" width="256" height="68" rx="4" fill="url(#novelty)" stroke="#cc8800" stroke-width="1.8"/>
+  <text x="367" y="396" class="nov" font-size="11">★ Two-leaf SPAC</text>
+  <text x="367" y="411" class="item" fill="#5c3e0a" font-size="10">  ψ_root → ψ_stem → ψ_leaf</text>
+  <text x="367" y="427" class="nov" font-size="11">★ Weibull P₅₀ + contact resistance</text>
+  <text x="367" y="441" class="item" fill="#5c3e0a" font-size="9.5" font-style="italic">  COMPASS-original</text>
+  <text x="357" y="475" class="item" fill="#666" font-style="italic">→ lE, H, GPP, ψ_l, T_c</text>
+
+  <!-- 2c FLAGSHIP NOVELTY -->
+  <rect x="640" y="285" width="310" height="200" rx="10" fill="url(#novelty)" stroke="#cc8800" stroke-width="3.5"/>
+  <text x="795" y="307" text-anchor="middle" class="panel-t" fill="#7d4506">★★ Four-Quadrant Canopy Water ★★</text>
+  <text x="795" y="322" text-anchor="middle" class="item" fill="#7d4506" font-style="italic" font-size="10.5">v30 flagship innovation · COMPASS-original</text>
+  <line x1="652" y1="328" x2="938" y2="328" stroke="#cc8800" stroke-width="0.4"/>
+
+  <!-- 2x2 grid: 4 cells width 130, total 264, centred horizontally inside 310-wide box -->
+  <g transform="translate(660, 336)">
+    <rect x="0"   y="0"  width="130" height="44" fill="url(#quad-sun)" stroke="#b78a1f" stroke-width="1.2"/>
+    <text x="65"  y="18" text-anchor="middle" class="item" font-weight="bold">Q1 Sun · Wet</text>
+    <text x="65"  y="34" text-anchor="middle" class="item" font-size="10">intercept E + photo</text>
+
+    <rect x="135" y="0"  width="130" height="44" fill="#fff2c4" stroke="#b78a1f" stroke-width="1.2"/>
+    <text x="200" y="18" text-anchor="middle" class="item" font-weight="bold">Q2 Sun · Dry</text>
+    <text x="200" y="34" text-anchor="middle" class="item" font-size="10">stomatal transp.</text>
+
+    <rect x="0"   y="48" width="130" height="44" fill="url(#quad-sha)" stroke="#345d8e" stroke-width="1.2"/>
+    <text x="65"  y="66" text-anchor="middle" class="item" font-weight="bold" fill="#0d233f">Q3 Shade · Wet</text>
+    <text x="65"  y="82" text-anchor="middle" class="item" font-size="10" fill="#0d233f">DEW allowed (lE&lt;0)</text>
+
+    <rect x="135" y="48" width="130" height="44" fill="#cad6ee" stroke="#345d8e" stroke-width="1.2"/>
+    <text x="200" y="66" text-anchor="middle" class="item" font-weight="bold" fill="#0d233f">Q4 Shade · Dry</text>
+    <text x="200" y="82" text-anchor="middle" class="item" font-size="10" fill="#0d233f">stomatal transp.</text>
+  </g>
+
+  <text x="795" y="455" text-anchor="middle" class="item" fill="#7d4506" font-size="10.5">Rutter cascade · two f_wet · |R| &lt; 1e−15 mm</text>
+  <text x="795" y="473" text-anchor="middle" class="item" fill="#7d4506" font-style="italic" font-size="10">→ T_f to soil</text>
+
+  <!-- ===== [3] SURFACE INTERFACE ===== -->
+  <rect x="30" y="540" width="940" height="42" fill="#fff4e6" stroke="#cc8800" stroke-width="1.5" rx="6"/>
+  <text x="50" y="563" class="layer-h-d" fill="#7d4506">[3]  Soil-Canopy Interface</text>
+  <text x="320" y="563" class="item">Throughfall · Infiltration · E_s · Rn_s · G · Ts,sun / Ts,sha · O₂ / CO₂ · Snow</text>
+
+  <!-- arrows canopy → surface (vertical, label LEFT of arrow not on top) -->
+  <g stroke-width="2" fill="none">
+    <line x1="190" y1="500" x2="190" y2="540" stroke="#27ae60" marker-end="url(#ar-g)"/>
+    <line x1="485" y1="500" x2="485" y2="540" stroke="#27ae60" marker-end="url(#ar-g)"/>
+    <line x1="795" y1="500" x2="795" y2="540" stroke="#c0392b" marker-end="url(#ar-r)"/>
+  </g>
+  <g class="arrow-l">
+    <text x="195" y="524" fill="#27ae60">aPAR · Rₙ_s</text>
+    <text x="492" y="524" fill="#27ae60">lE · H · GPP · ψ</text>
+    <text x="803" y="524" fill="#c0392b">T_f · dew</text>
+  </g>
+
+  <!-- arrows surface → soil -->
+  <g stroke-width="2" fill="none">
+    <line x1="190" y1="582" x2="190" y2="618" stroke="#1e66bf" marker-end="url(#ar-b)"/>
+    <line x1="450" y1="582" x2="450" y2="618" stroke="#c0392b" marker-end="url(#ar-r)"/>
+    <line x1="700" y1="582" x2="700" y2="618" stroke="#666"   marker-end="url(#ar)"/>
+    <line x1="900" y1="582" x2="900" y2="618" stroke="#7e57c2" marker-end="url(#ar-pur)"/>
+  </g>
+  <g class="arrow-l">
+    <text x="196" y="605" fill="#1e66bf">infiltration</text>
+    <text x="456" y="605" fill="#c0392b">G · Ts</text>
+    <text x="706" y="605" fill="#666">vapor / O₂ / CO₂</text>
+    <text x="906" y="605" fill="#7e57c2">N deposition</text>
+  </g>
+
+  <!-- ===== [4] SOIL COLUMN ===== -->
+  <rect x="30" y="618" width="940" height="222" fill="url(#soi)" stroke="#3d2010" stroke-width="1.5" rx="6"/>
+  <text x="50" y="640" class="layer-h">[4]  Soil Column  ·  ★ Deep-profile (configurable depth, 8–10 m for Loess vadose zone)</text>
+
+  <!-- 4a Water -->
+  <rect x="50" y="654" width="290" height="172" rx="8" fill="rgba(255,255,255,0.97)" stroke="#3d2010" stroke-width="1.5"/>
+  <text x="195" y="676" text-anchor="middle" class="panel-t" fill="#3d2010">Water</text>
+  <line x1="62" y1="685" x2="328" y2="685" stroke="#3d2010" stroke-width="0.4"/>
+  <g class="item">
+    <text x="62" y="705">Richards + Van Genuchten / Mualem</text>
+    <text x="62" y="725" font-weight="bold" fill="#7d4506">★ Hysteresis (Kool-Parker)</text>
+    <text x="62" y="745" font-weight="bold" fill="#7d4506">★ Dual-porosity (mobile / immobile)</text>
+    <text x="62" y="765">Frozen-soil impedance</text>
+    <text x="62" y="785">Root uptake (Jackson β=0.982)</text>
+    <text x="62" y="805" font-weight="bold" fill="#7d4506">★ CLM5 hydraulic redistribution</text>
+  </g>
+
+  <!-- 4b Heat -->
+  <rect x="350" y="654" width="290" height="172" rx="8" fill="rgba(255,255,255,0.97)" stroke="#3d2010" stroke-width="1.5"/>
+  <text x="495" y="676" text-anchor="middle" class="panel-t" fill="#3d2010">Heat</text>
+  <line x1="362" y1="685" x2="628" y2="685" stroke="#3d2010" stroke-width="0.4"/>
+  <g class="item">
+    <text x="362" y="705">1-D conduction + advection</text>
+    <text x="362" y="725">Cosenza thermal conductivity</text>
+    <text x="362" y="745">Liquid + vapor + ice phase change</text>
+    <text x="362" y="765" font-weight="bold" fill="#7d4506">★ Three-phase freeze-thaw (Yu 2018)</text>
+    <text x="362" y="785">Configurable bottom T BC</text>
+  </g>
+
+  <!-- 4c Gas + N -->
+  <rect x="650" y="654" width="305" height="172" rx="8" fill="rgba(255,255,255,0.97)" stroke="#3d2010" stroke-width="1.5"/>
+  <text x="802" y="676" text-anchor="middle" class="panel-t" fill="#3d2010">Gas + Nitrogen</text>
+  <line x1="662" y1="685" x2="943" y2="685" stroke="#3d2010" stroke-width="0.4"/>
+  <g class="item">
+    <text x="662" y="705">Dry air · vapor · O₂ · CO₂</text>
+    <text x="662" y="725" font-weight="bold" fill="#7d4506">★ Full N transport (NH₄, NO₃, urea)</text>
+    <text x="662" y="745">Mineralization · nitrification</text>
+    <text x="662" y="765">Denitrification · biological N fixation</text>
+    <text x="662" y="785" font-weight="bold" fill="#7d4506" font-size="10.5">★ Synchronous reaction ⇄ transport</text>
+    <text x="662" y="800" fill="#7d4506" font-style="italic" font-size="10">  in-step with water·heat·gas (mass-conserving)</text>
+  </g>
+
+  <!-- ===== [5] SOLVER (right column) ===== -->
+  <rect x="990" y="148" width="490" height="692" fill="url(#solver)" stroke="#5e35b1" stroke-width="1.5" rx="6"/>
+  <text x="1235" y="172" text-anchor="middle" class="layer-h-d" fill="#3a1f6c">[5]  Solver  &amp;  Control</text>
+  <line x1="1010" y1="180" x2="1460" y2="180" stroke="#5e35b1" stroke-width="0.4"/>
+
+  <g class="item" fill="#2c1956">
+    <text x="1010" y="208">Outer step Δt = 1 h (forcing-locked)</text>
+    <text x="1010" y="232">Inner Picard (water + heat + gas)</text>
+    <text x="1010" y="256" font-weight="bold" fill="#7d4506">★ Anderson acceleration (mixed-Newton)</text>
+    <text x="1010" y="280" font-weight="bold" fill="#7d4506">★ Adaptive sub-step + rollback</text>
+    <text x="1010" y="304">Tridiagonal Thomas (per equation)</text>
+    <text x="1010" y="328">SCOPE-GUARD (T-bound check)</text>
+    <text x="1010" y="362" font-weight="bold">Calibration</text>
+    <text x="1010" y="382">GA (global) + fmincon (local)</text>
+    <text x="1010" y="402">Multi-objective (LAI · θ · ET)</text>
+    <text x="1010" y="436" font-weight="bold">I/O</text>
+    <text x="1010" y="456">Hourly CSV + .mat outputs</text>
+    <text x="1010" y="476">Resume from any KT (checkpoint)</text>
+  </g>
+
+  <!-- HIGHLIGHT: Solver novelty -->
+  <rect x="1010" y="500" width="450" height="84" rx="6" fill="url(#novelty)" stroke="#cc8800" stroke-width="2"/>
+  <text x="1235" y="518" text-anchor="middle" class="nov">★ COMPASS Solver Novelty</text>
+  <g class="item" fill="#5c3e0a" font-size="10.5">
+    <text x="1020" y="538">• Mass conservation enforced  |R| &lt; 1×10⁻¹⁵ mm/step</text>
+    <text x="1020" y="556">• Adaptive Picard + Anderson  →  no FATAL in 120 KT</text>
+    <text x="1020" y="574">• 1900-line main loop · 50+ helper modules</text>
+  </g>
+
+  <!-- arrows from solver to physics layers -->
+  <g stroke="#7e57c2" stroke-width="1.5" stroke-dasharray="4,3" fill="none">
+    <line x1="990" y1="370" x2="970" y2="370" marker-end="url(#ar-pur)"/>
+    <line x1="990" y1="540" x2="970" y2="540" marker-end="url(#ar-pur)"/>
+    <line x1="990" y1="710" x2="970" y2="710" marker-end="url(#ar-pur)"/>
+  </g>
+  <text x="1235" y="610" text-anchor="middle" class="item" fill="#7e57c2" font-style="italic">drives all coupling</text>
+
+  <!-- Multi-physics coupling sub-box -->
+  <rect x="1010" y="630" width="450" height="200" rx="6" fill="rgba(255,255,255,0.85)" stroke="#888" stroke-width="0.6"/>
+  <text x="1235" y="652" text-anchor="middle" font-weight="bold" font-size="12" fill="#333">Multi-physics coupling</text>
+  <g class="item" font-size="11">
+    <text x="1020" y="676">Canopy ⇄ Soil:</text>
+    <text x="1030" y="696" fill="#27ae60">  • root water uptake (S)</text>
+    <text x="1030" y="714" fill="#1e66bf">  • ψ_soil → ψ_root → ψ_leaf  (SPAC)</text>
+    <text x="1030" y="732" fill="#7e57c2">  • root N uptake (NH₄, NO₃)</text>
+    <text x="1020" y="758">Within soil:</text>
+    <text x="1030" y="776">  • water ⇄ heat (K(T), vapor latent)</text>
+    <text x="1030" y="794">  • water ⇄ gas (vapor diffusion, O₂)</text>
+    <text x="1030" y="812">  • water ⇄ N (advective transport)</text>
+  </g>
+
+  <!-- ===== Cross-layer coupling arrows (label OUTSIDE arrow path, inside soil panel margin) ===== -->
+  <!-- root water uptake: place arrow at far left, label to its left so it doesn't collide -->
+  <line x1="105" y1="618" x2="105" y2="500" stroke="#27ae60" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#ar-g)"/>
+  <text x="40" y="563" class="arrow-l" fill="#27ae60" font-style="italic">root water</text>
+  <text x="40" y="577" class="arrow-l" fill="#27ae60" font-style="italic">uptake</text>
+
+  <line x1="265" y1="618" x2="265" y2="500" stroke="#1e66bf" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#ar-b)"/>
+  <text x="276" y="565" class="arrow-l" fill="#1e66bf" font-style="italic">ψ_soil →</text>
+  <text x="276" y="578" class="arrow-l" fill="#1e66bf" font-style="italic">ψ_root</text>
+
+  <line x1="800" y1="618" x2="800" y2="500" stroke="#7e57c2" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#ar-pur)"/>
+  <text x="811" y="565" class="arrow-l" fill="#7e57c2" font-style="italic">root N</text>
+  <text x="811" y="578" class="arrow-l" fill="#7e57c2" font-style="italic">uptake</text>
+
+  <!-- Water table -->
+  <rect x="30" y="848" width="1450" height="22" fill="url(#gw)" opacity="0.85" stroke="#0a3a73" rx="3"/>
+  <text x="50" y="864" class="layer-h" font-size="12">▽  Water Table  /  Bottom Boundary  (user-configurable; deep vadose-zone capable)</text>
+</svg>

@@ -1,0 +1,35 @@
+{
+  "skill_name": "compass-julia-port",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "把 COMPASS 的 van Genuchten 保水函数翻成 Julia，给我能直接放进 COMPASS.jl 的实现。",
+      "expected_output": "Before coding, inspect the current COMPASSV2.0 production caller/callee closure, active switches, units, orientation and tests. Produce a V2 source map and parity plan; do not rely on V1 dossiers or remembered formulas. Implement only after unresolved evidence is cleared, preserving the exact V2 constitutive and boundary semantics.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "设计 Julia 输入层，site.toml 里可选参数不写就用默认值，写了就必须生效。",
+      "expected_output": "Audit io.loadSiteConfig, resolveSimulationPlan, loadSite, checkSite, buildState/buildWaterOnlyState and the actual consumers of every affected key. Separate raw parse/provenance, validation, typed normalization and derived inputs. Missing keys are allowed only by an explicit schema default or inactive component; written unsupported/unconsumed keys fail fast. Include laboratory, point and spatial adapters without claiming runnable regional/global physics.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "COMPASS 主循环迁到 Julia，直接用 DifferentialEquations.jl 重写可以吗？",
+      "expected_output": "Read current runCOMPASS, beginRun, runOneStep, soil.advance, transaction commit/rollback, finalizeRun and tests first. Explain that current V2 runOneStep is a real atomic multi-domain transaction, not the old no-op dossier. Preserve adaptive substeps, active boundaries, event restaging, post-soil N candidate and failure checkpoint semantics; use SciML only where numerical equivalence is proved.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "MATLAB 已经有 regional 数组，Julia 版是不是可以直接宣布支持区域和全球？",
+      "expected_output": "Reject the premise after source verification: V2 regional initialization/override contracts exist, but the coupled h/U/P_g production solver fails fast for nCell>1, and no global production runtime is confirmed. Design a shared Column contract and spatial execution layer, but label regional/global solve capability not implemented until executable parity, aggregation, failure isolation and I/O tests pass.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "为了迁移快一点，我想把新的 Julia 状态都放进一个 model 字典，后面再按架构文档拆。",
+      "expected_output": "Do not implement the shortcut. Check the binding migration plan, complete architecture, and reference-model spatial architecture review. Explain the conflict with domain ownership, typed interfaces, Column transaction boundaries and implementation gates; mark ARCHITECTURE_CONFLICT and redesign before coding, while still using V2 source as the oracle for current physics.",
+      "files": []
+    }
+  ]
+}

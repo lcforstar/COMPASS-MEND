@@ -1,0 +1,26 @@
+function face=bottomLiquidBoundaryForSolutes(request,waterFlux,firstNode)
+%BOTTOMLIQUIDBOUNDARYFORSOLUTES Apply the explicit free-drainage phase closure.
+% Called for DOM or BIOPARTICLE's site-declared liquid_only boundary. At this
+% boundary vapor exchange is zero, so accepted total QMB is liquid water.
+% QMB [cm/s] is positive INTO the column (upward at the physical bottom).
+% Never substitute the bottom element-centre QL for this external face.
+% The record shares the accepted water tile's interval and physical node 1.
+% Other water policies, elevated groundwater interfaces and inflow fail.
+% This adapter does not modify the water solve or its accepted reaction.
+% Editor: Wenjie Liu; Date: 2026-09-29.
+% Change: 2026-09-29 Wenjie Liu -- share the water-owned face with particles;
+% historical error identifiers are retained for caller compatibility.
+    assert(strcmp(request.bottom.kind,'free_drainage')&&firstNode==1, ...
+        'soil:dom:unsupportedWaterBoundary', ...
+        'Mobile-carrier outflow requires free drainage at the physical column bottom.');
+    q=waterFlux.QMB;
+    assert(isnumeric(q)&&isscalar(q)&&isfinite(q), ...
+        'soil:dom:bottomWaterFlux','Accepted bottom water flux must be finite.');
+    assert(q<=0,'soil:dom:bottomInflowUnsupported', ...
+        'Bottom inflow requires external solute/particle concentrations; no zero inflow is assumed.');
+    face=struct('schema_version',1,'kind','advective_outflow', ...
+        'phase_contract','free_drainage_liquid_only_zero_vapor', ...
+        'position','physical_column_bottom','positive_direction','into_domain', ...
+        'q_liquid_cm_s',q,'q_vapor_cm_s',0, ...
+        't_start_s',request.t_start_s,'t_end_s',request.t_end_s,'dt_s',request.dt_s);
+end

@@ -1,0 +1,8 @@
+# Preserve scientific source/input bytes and their release SHA256 on all hosts.
+* -text
+*.nc binary
+*.mat binary
+*.xlsx binary
+*.png binary
+*.pdf binary
+*.zip binary

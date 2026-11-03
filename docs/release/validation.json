@@ -1,0 +1,1459 @@
+{
+  "status": "PASS",
+  "date": "2026-10-31",
+  "release": "COMPASS-MEND 1.0",
+  "initial_package_validation_historical": {
+    "status": "PASS",
+    "release": "COMPASS-MEND 1.0",
+    "date": "2026-10-31",
+    "MATLAB": "25.1.0.2943329 (R2025a)",
+    "operating_system": "Windows",
+    "JVM_enabled": true,
+    "standalone_public_entry": {
+      "requested_steps": 4,
+      "accepted_steps": 4,
+      "full_diagnostics": true,
+      "production_source_paths_within_release": true,
+      "checked_entry_paths": [
+        "run_site.m",
+        "src/runCOMPASS.m",
+        "src/+init/initialize.m",
+        "src/+io/checkSite.m",
+        "src/+diagnostics/acceptedOrganicAudit.m",
+        "src/+diagnostics/writeStep.m",
+        "src/+soil/+microbe/advanceSourceCandidate.m",
+        "src/+soil/+nitrogen/+tracer/advanceCandidate.m"
+      ],
+      "MEND_flux_contract_count": 29,
+      "profile_and_column_NC_finite": true,
+      "three_fertilizer_N_cohorts_pass": true,
+      "C_residual_g_cm2": 5.333622473259296e-16,
+      "N_residual_g_cm2": 6.635656108790189e-18,
+      "C_tolerance_g_cm2": 1e-10,
+      "N_tolerance_g_cm2": 1e-12,
+      "source_tolerance_g_cm2": 2e-12,
+      "source_numerical_corrections_zero": true
+    },
+    "Windows_launcher": {
+      "entry": "run.bat changwu",
+      "wait_exit_code": 0,
+      "accepted_steps": 1,
+      "configured_steps": 8760,
+      "full_window_completed": false,
+      "run_specific_actual_PID_receipt": true
+    },
+    "Linux_launcher": "Bash syntax and LF line endings checked; Linux MATLAB launch not executed in this packaging task",
+    "optional_GUI": "Tk import and run-specific progress/failure logic tested; no GUI window opened",
+    "native_profile_viewer": "Rendered native-state PNG and vector PDF; all five panels visually inspected",
+    "full_historical_test_suite_run": false,
+    "new_annual_run_performed": false,
+    "production_src_files_byte_unchanged": 817,
+    "original_workspace_and_server_tasks_unchanged": true
+  },
+  "layered_sorption_interface": {
+    "physical_defaults_unchanged": true,
+    "production_source_files_synced": 817,
+    "changed_production_files": [
+      "src/+init/buildMendHourlyState.m",
+      "src/+init/buildSoilMicrobes.m",
+      "src/+soil/+microbe/advanceSourceCandidate.m",
+      "src/+io/+adapters/mendLayerParameterSpec.m",
+      "src/+io/+adapters/resolveMendLayerParameters.m"
+    ],
+    "bitwise_native_regression": {
+      "status": "PASS",
+      "runs": [
+        {
+          "folder": "<local-verification-archive>\\validation\\old4",
+          "matlab_release": "2025a",
+          "accepted_steps": 4
+        },
+        {
+          "folder": "<local-verification-archive>\\validation\\newlegacy4",
+          "matlab_release": "2025a",
+          "accepted_steps": 4
+        },
+        {
+          "folder": "<local-verification-archive>\\validation\\newprofile4",
+          "matlab_release": "2025a",
+          "accepted_steps": 4
+        }
+      ],
+      "comparisons": [
+        {
+          "baseline": "<local-verification-archive>\\validation\\old4",
+          "candidate": "<local-verification-archive>\\validation\\newlegacy4",
+          "cold_Y_exact": true,
+          "forcing_exact": true,
+          "physical_parameters_exact_after_declared_normalization": true,
+          "all4_accepted_Y_exact": true,
+          "all29_native_fluxes_exact": true,
+          "native_CN_DIN_O2_budgets_exact": true,
+          "all29_registry_profiles_and_rates_exact": true,
+          "all29_NC_profiles_and_rates_exact": true,
+          "three_source_residuals_exact": true,
+          "physical_byte_checks": [
+            {
+              "field": "cold_Y",
+              "SHA256": "2dbd966a29abd07b40e74007c990adfbdea1dee05e5d2c66f57daf467b20dc66",
+              "strict_byte_match": true
+            },
+            {
+              "field": "cold_forcing",
+              "SHA256": "004b3f3079e955864d543c640c8e1c509881a6f41aef25b44aae0e939730a078",
+              "strict_byte_match": true
+            },
+            {
+              "field": "domain",
+              "SHA256": "defc262b480a0723388f572bba45dffca0d2352b8522b1496fb967e996a0b6b0",
+              "strict_byte_match": true
+            },
+            {
+              "field": "control",
+              "SHA256": "0e629c41de30d186391c8158d268101f428bf5bccb10a33630cf65a72a5a69a9",
+              "strict_byte_match": true
+            },
+            {
+              "field": "boundary",
+              "SHA256": "ecf1d23cfcf3f9f35c2bccacc2756a8996037550596f33dc55d1fd872cb95723",
+              "strict_byte_match": true
+            },
+            {
+              "field": "sources",
+              "SHA256": "e82099645fdbab38d5fd515e0d8a7f4a2f184f42bca5dee9a92c6330e2e29a11",
+              "strict_byte_match": true
+            },
+            {
+              "field": "accepted_Y",
+              "SHA256": "3e637bb418f60d8243952f3c69eadd063e8eb693c14c136374f493e2730297cd",
+              "strict_byte_match": true
+            },
+            {
+              "field": "native_integrated_fluxes",
+              "SHA256": "b25b18cf5113bdcfca5d733fb1086df2bc83dbc9efd2abdfcebd1ca8942b2dd7",
+              "strict_byte_match": true
+            },
+            {
+              "field": "native_audit_rows",
+              "SHA256": "8a83c2ec004646d80763ef0c0377f95579e77af79f064da1fa8d522b112e0309",
+              "strict_byte_match": true
+            },
+            {
+              "field": "native_cumulative_budgets",
+              "SHA256": "7e9f36d5d99f18107cf3550ff3e71b10db6751218bf0c4ca7affc0e0dc566c6e",
+              "strict_byte_match": true
+            },
+            {
+              "field": "registry_profiles",
+              "SHA256": "7a8b787b68f0b6e7aef31e529fc5b6da19c2faf7990d6e890d5332aa87c40c0a",
+              "strict_byte_match": true
+            },
+            {
+              "field": "registry_rates",
+              "SHA256": "58823a50ab6a94684750ab9922855327705f0f8ef3b479ea8dcfa0e441332ace",
+              "strict_byte_match": true
+            },
+            {
+              "field": "written_profiles",
+              "SHA256": "4bdc5ea10df76bd156d81621ac4f6039d6e94ff2ded03527b51086b5395dee0c",
+              "strict_byte_match": true
+            },
+            {
+              "field": "written_rates",
+              "SHA256": "425fed8f7532fbb8d5fe7688ef0e2decf6ee0f85f30f1155391ef2ac91a19f03",
+              "strict_byte_match": true
+            },
+            {
+              "field": "source_residuals",
+              "SHA256": "c8542aa425374c963da7314cccbdb3264a208e358276339d8768f5eb115393f7",
+              "strict_byte_match": true
+            }
+          ],
+          "optical_alias_audit": [
+            {
+              "key": "atmosphere_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\atmosphere\\FLEX-S3_std.nc",
+              "candidate": "<local-verification-archive>\\model_library_nc\\atmosphere\\FLEX-S3_std.nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "directional_angles_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\directional\\brdf_angles2.nc",
+              "candidate": "<local-verification-archive>\\model_library_nc\\directional\\brdf_angles2.nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "leaf_optics_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\leaf_optics\\Optipar2017_ProspectD.nc",
+              "candidate": "<local-verification-archive>\\model_library_nc\\leaf_optics\\Optipar2017_ProspectD.nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "model_library_dir",
+              "baseline": "<local-verification-archive>\\model_library_nc",
+              "candidate": "<local-verification-archive>\\model_library_nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "soil_spectrum_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\soil_spectrum\\soilnew.nc",
+              "candidate": "<local-verification-archive>\\model_library_nc\\soil_spectrum\\soilnew.nc",
+              "physical_files_identical": true
+            }
+          ]
+        },
+        {
+          "baseline": "<local-verification-archive>\\validation\\old4",
+          "candidate": "<local-verification-archive>\\validation\\newprofile4",
+          "cold_Y_exact": true,
+          "forcing_exact": true,
+          "physical_parameters_exact_after_declared_normalization": true,
+          "all4_accepted_Y_exact": true,
+          "all29_native_fluxes_exact": true,
+          "native_CN_DIN_O2_budgets_exact": true,
+          "all29_registry_profiles_and_rates_exact": true,
+          "all29_NC_profiles_and_rates_exact": true,
+          "three_source_residuals_exact": true,
+          "physical_byte_checks": [
+            {
+              "field": "cold_Y",
+              "SHA256": "2dbd966a29abd07b40e74007c990adfbdea1dee05e5d2c66f57daf467b20dc66",
+              "strict_byte_match": true
+            },
+            {
+              "field": "cold_forcing",
+              "SHA256": "004b3f3079e955864d543c640c8e1c509881a6f41aef25b44aae0e939730a078",
+              "strict_byte_match": true
+            },
+            {
+              "field": "domain",
+              "SHA256": "defc262b480a0723388f572bba45dffca0d2352b8522b1496fb967e996a0b6b0",
+              "strict_byte_match": true
+            },
+            {
+              "field": "control",
+              "SHA256": "0e629c41de30d186391c8158d268101f428bf5bccb10a33630cf65a72a5a69a9",
+              "strict_byte_match": true
+            },
+            {
+              "field": "boundary",
+              "SHA256": "ecf1d23cfcf3f9f35c2bccacc2756a8996037550596f33dc55d1fd872cb95723",
+              "strict_byte_match": true
+            },
+            {
+              "field": "sources",
+              "SHA256": "e82099645fdbab38d5fd515e0d8a7f4a2f184f42bca5dee9a92c6330e2e29a11",
+              "strict_byte_match": true
+            },
+            {
+              "field": "accepted_Y",
+              "SHA256": "3e637bb418f60d8243952f3c69eadd063e8eb693c14c136374f493e2730297cd",
+              "strict_byte_match": true
+            },
+            {
+              "field": "native_integrated_fluxes",
+              "SHA256": "b25b18cf5113bdcfca5d733fb1086df2bc83dbc9efd2abdfcebd1ca8942b2dd7",
+              "strict_byte_match": true
+            },
+            {
+              "field": "native_audit_rows",
+              "SHA256": "8a83c2ec004646d80763ef0c0377f95579e77af79f064da1fa8d522b112e0309",
+              "strict_byte_match": true
+            },
+            {
+              "field": "native_cumulative_budgets",
+              "SHA256": "7e9f36d5d99f18107cf3550ff3e71b10db6751218bf0c4ca7affc0e0dc566c6e",
+              "strict_byte_match": true
+            },
+            {
+              "field": "registry_profiles",
+              "SHA256": "7a8b787b68f0b6e7aef31e529fc5b6da19c2faf7990d6e890d5332aa87c40c0a",
+              "strict_byte_match": true
+            },
+            {
+              "field": "registry_rates",
+              "SHA256": "58823a50ab6a94684750ab9922855327705f0f8ef3b479ea8dcfa0e441332ace",
+              "strict_byte_match": true
+            },
+            {
+              "field": "written_profiles",
+              "SHA256": "4bdc5ea10df76bd156d81621ac4f6039d6e94ff2ded03527b51086b5395dee0c",
+              "strict_byte_match": true
+            },
+            {
+              "field": "written_rates",
+              "SHA256": "425fed8f7532fbb8d5fe7688ef0e2decf6ee0f85f30f1155391ef2ac91a19f03",
+              "strict_byte_match": true
+            },
+            {
+              "field": "source_residuals",
+              "SHA256": "c8542aa425374c963da7314cccbdb3264a208e358276339d8768f5eb115393f7",
+              "strict_byte_match": true
+            }
+          ],
+          "optical_alias_audit": [
+            {
+              "key": "atmosphere_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\atmosphere\\FLEX-S3_std.nc",
+              "candidate": "<source-worktree>\\data\\model_library_nc\\atmosphere\\FLEX-S3_std.nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "directional_angles_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\directional\\brdf_angles2.nc",
+              "candidate": "<source-worktree>\\data\\model_library_nc\\directional\\brdf_angles2.nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "leaf_optics_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\leaf_optics\\Optipar2017_ProspectD.nc",
+              "candidate": "<source-worktree>\\data\\model_library_nc\\leaf_optics\\Optipar2017_ProspectD.nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "model_library_dir",
+              "baseline": "<local-verification-archive>\\model_library_nc",
+              "candidate": "<source-worktree>\\data\\model_library_nc",
+              "physical_files_identical": true
+            },
+            {
+              "key": "soil_spectrum_file",
+              "baseline": "<local-verification-archive>\\model_library_nc\\soil_spectrum\\soilnew.nc",
+              "candidate": "<source-worktree>\\data\\model_library_nc\\soil_spectrum\\soilnew.nc",
+              "physical_files_identical": true
+            }
+          ]
+        }
+      ],
+      "normalization": "Only optical aliases after file-content checks; native input-owner/mapping audit metadata; newly added3 reference fields; scalar hourly sorption expanded toNL",
+      "no_physical_state_or_flux_normalization": true,
+      "model_steps_started_by_comparison": 0,
+      "strict_bitwise_method": "SHA256 of getByteStreamFromArray on physical values/structs after separate isequaln; does not hash MAT/HDF5 files and preserves signed zero/native representations",
+      "annual_parity_claimed": false,
+      "scope": "Four-hour native trajectories and exact cold/forcing promotion, not a new annual simulation"
+    },
+    "layer_contracts": {
+      "status": "PASS",
+      "source_dir": "<source-worktree>/src",
+      "profile_site": "<source-worktree>/data/sites/changwu",
+      "legacy_site": "<local-verification-archive>/before/site",
+      "native_heterogeneous_mapping": true,
+      "layer_count": 58,
+      "zero_Kba_and_Kdes_valid": true,
+      "Qmax_strictly_positive": true,
+      "legacy_scalar_and_mixed_sole_ownership": true,
+      "RK4_missing_all3_initialization_passed": true,
+      "RK4_provided_values_still_validated": true,
+      "RK4_probe_scope": "Detached valid equilibrium configuration: manure fast input and source-only tracers disabled; no site edits",
+      "checks": [
+        {
+          "case": "duplicate_mend_qmax_mg_g",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_qmax_mg_g cannot be defined in both soil.csv and site.toml [microbe]."
+        },
+        {
+          "case": "source_missing_mend_qmax_mg_g",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: Supply MEND parameter mend_qmax_mg_g in soil.csv or as a legacy site scalar."
+        },
+        {
+          "case": "invalid_mend_qmax_mg_g_-1",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_qmax_mg_g is outside its physical input domain."
+        },
+        {
+          "case": "invalid_mend_qmax_mg_g_NaN",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: soil:mend_qmax_mg_g must be a finite real scalar/column."
+        },
+        {
+          "case": "invalid_mend_qmax_mg_g_Inf",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: soil:mend_qmax_mg_g must be a finite real scalar/column."
+        },
+        {
+          "case": "mixed_sole_owner_mend_qmax_mg_g",
+          "status": "PASS"
+        },
+        {
+          "case": "legacy_vector_mend_qmax_mg_g",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: site.toml microbe.mend_qmax_mg_g is legacy scalar-only; use soil.csv for a profile."
+        },
+        {
+          "case": "duplicate_mend_kba_g_mg",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kba_g_mg cannot be defined in both soil.csv and site.toml [microbe]."
+        },
+        {
+          "case": "source_missing_mend_kba_g_mg",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: Supply MEND parameter mend_kba_g_mg in soil.csv or as a legacy site scalar."
+        },
+        {
+          "case": "invalid_mend_kba_g_mg_-1",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kba_g_mg is outside its physical input domain."
+        },
+        {
+          "case": "invalid_mend_kba_g_mg_NaN",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: soil:mend_kba_g_mg must be a finite real scalar/column."
+        },
+        {
+          "case": "invalid_mend_kba_g_mg_Inf",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: soil:mend_kba_g_mg must be a finite real scalar/column."
+        },
+        {
+          "case": "mixed_sole_owner_mend_kba_g_mg",
+          "status": "PASS"
+        },
+        {
+          "case": "legacy_vector_mend_kba_g_mg",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: site.toml microbe.mend_kba_g_mg is legacy scalar-only; use soil.csv for a profile."
+        },
+        {
+          "case": "duplicate_mend_kdes_mg_g_h",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kdes_mg_g_h cannot be defined in both soil.csv and site.toml [microbe]."
+        },
+        {
+          "case": "source_missing_mend_kdes_mg_g_h",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: Supply MEND parameter mend_kdes_mg_g_h in soil.csv or as a legacy site scalar."
+        },
+        {
+          "case": "invalid_mend_kdes_mg_g_h_-1",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kdes_mg_g_h is outside its physical input domain."
+        },
+        {
+          "case": "invalid_mend_kdes_mg_g_h_NaN",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: soil:mend_kdes_mg_g_h must be a finite real scalar/column."
+        },
+        {
+          "case": "invalid_mend_kdes_mg_g_h_Inf",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: soil:mend_kdes_mg_g_h must be a finite real scalar/column."
+        },
+        {
+          "case": "mixed_sole_owner_mend_kdes_mg_g_h",
+          "status": "PASS"
+        },
+        {
+          "case": "legacy_vector_mend_kdes_mg_g_h",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: site.toml microbe.mend_kdes_mg_g_h is legacy scalar-only; use soil.csv for a profile."
+        },
+        {
+          "case": "Qmax_zero",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_qmax_mg_g is outside its physical input domain."
+        },
+        {
+          "case": "zero_accepted_mend_kba_g_mg",
+          "status": "PASS"
+        },
+        {
+          "case": "zero_accepted_mend_kdes_mg_g_h",
+          "status": "PASS"
+        },
+        {
+          "case": "rk4_provided_negative_mend_qmax_mg_g",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_qmax_mg_g is outside its physical input domain."
+        },
+        {
+          "case": "rk4_provided_duplicate_mend_qmax_mg_g",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_qmax_mg_g cannot be defined in both soil.csv and site.toml [microbe]."
+        },
+        {
+          "case": "rk4_provided_negative_mend_kba_g_mg",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kba_g_mg is outside its physical input domain."
+        },
+        {
+          "case": "rk4_provided_duplicate_mend_kba_g_mg",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kba_g_mg cannot be defined in both soil.csv and site.toml [microbe]."
+        },
+        {
+          "case": "rk4_provided_negative_mend_kdes_mg_g_h",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kdes_mg_g_h is outside its physical input domain."
+        },
+        {
+          "case": "rk4_provided_duplicate_mend_kdes_mg_g_h",
+          "status": "PASS",
+          "error_identifier": "checkSite:invalid",
+          "error_message": "Site check failed:\n  - MEND kinetic inputs: MEND parameter mend_kdes_mg_g_h cannot be defined in both soil.csv and site.toml [microbe]."
+        }
+      ],
+      "native_candidate_checks": [
+        {
+          "case": "heterogeneous",
+          "status": "PASS",
+          "native_fluxes": 29,
+          "max_C_residual_mg_g": 1.3322676295501878e-15,
+          "max_N_residual_mg_g": 1.5481861745633208e-16,
+          "C_tolerance_mg_g": 1e-10,
+          "N_tolerance_mg_g": 1e-10,
+          "accepted_input_unchanged": true
+        },
+        {
+          "case": "zero_mend_kba_g_mg",
+          "status": "PASS",
+          "native_fluxes": 29,
+          "max_C_residual_mg_g": 1.3322676295501878e-15,
+          "max_N_residual_mg_g": 1.6869640526414654e-16,
+          "C_tolerance_mg_g": 1e-10,
+          "N_tolerance_mg_g": 1e-10,
+          "accepted_input_unchanged": true
+        },
+        {
+          "case": "zero_mend_kdes_mg_g_h",
+          "status": "PASS",
+          "native_fluxes": 29,
+          "max_C_residual_mg_g": 1.3322676295501878e-15,
+          "max_N_residual_mg_g": 1.5481861745633208e-16,
+          "C_tolerance_mg_g": 1e-10,
+          "N_tolerance_mg_g": 1e-10,
+          "accepted_input_unchanged": true
+        }
+      ],
+      "coupled_model_steps": 0,
+      "manufactured_test_profiles_not_calibrated_inputs": true,
+      "site_or_source_modified": false,
+      "matlab_release": "2025a"
+    },
+    "detached_dynamic_sorption": {
+      "status": "PASS",
+      "site_inputs_modified": false,
+      "DIN_chemistry_modified": false,
+      "model_time_advanced": false,
+      "independent_Fortran_trajectory_test": "run separately: verifyMendSourceMatlab",
+      "site_state": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 2.220446049250313e-16,
+        "max_paired_sorbed_N_error_mg_g": 2.7755575615628914e-17,
+        "max_C_balance_g_cm3": 5.345905344349545e-18,
+        "max_N_balance_g_cm3": 4.126868182524528e-19,
+        "gross_adsorption_range_mg_g": [
+          0.0005994927326652122,
+          0.003312848939338779
+        ],
+        "gross_desorption_range_mg_g": [
+          0.0005330490177726449,
+          0.0026615714027673973
+        ],
+        "net_sorption_range_mg_g": [
+          -4.312523510532993e-05,
+          0.0006578085174598325
+        ]
+      },
+      "mixed_donors": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+        "max_paired_sorbed_N_error_mg_g": 6.938893903907228e-18,
+        "max_C_balance_g_cm3": 3.883086889066881e-18,
+        "max_N_balance_g_cm3": 3.671723424200647e-19,
+        "gross_adsorption_range_mg_g": [
+          2.519951996453586e-05,
+          0.006815868229484357
+        ],
+        "gross_desorption_range_mg_g": [
+          8.421052631578948e-05,
+          0.0018000000000000002
+        ],
+        "net_sorption_range_mg_g": [
+          -0.0017748004800354643,
+          0.006495868229484357
+        ]
+      },
+      "Kd_and_water_volume_do_not_repartition_DQ": true,
+      "double_Qmax": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+        "max_paired_sorbed_N_error_mg_g": 6.938893903907228e-18,
+        "max_C_balance_g_cm3": 3.883086889066881e-18,
+        "max_N_balance_g_cm3": 3.671723424200647e-19,
+        "gross_adsorption_range_mg_g": [
+          3.059941709979354e-05,
+          0.007007864517638846
+        ],
+        "gross_desorption_range_mg_g": [
+          4.210526315789474e-05,
+          0.0009000000000000001
+        ],
+        "net_sorption_range_mg_g": [
+          -0.0008694005829002065,
+          0.006847864517638845
+        ]
+      },
+      "at_Qmax": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 2.220446049250313e-16,
+        "max_paired_sorbed_N_error_mg_g": 1.3877787807814457e-17,
+        "max_C_balance_g_cm3": 5.078815342001073e-18,
+        "max_N_balance_g_cm3": 5.206251317083572e-19,
+        "gross_adsorption_range_mg_g": [
+          -1.1990214081958638e-18,
+          5.995117081790351e-19
+        ],
+        "gross_desorption_range_mg_g": [
+          0.005999999999999999,
+          0.006000000000000001
+        ],
+        "net_sorption_range_mg_g": [
+          -0.006000000000000002,
+          -0.005999999999999998
+        ]
+      },
+      "scalar_uniform_profile_bitwise_parity": true,
+      "heterogeneous_sorption": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+        "max_paired_sorbed_N_error_mg_g": 6.938893903907228e-18,
+        "max_C_balance_g_cm3": 3.883086889066881e-18,
+        "max_N_balance_g_cm3": 3.671723424200647e-19,
+        "gross_adsorption_range_mg_g": [
+          1.0709524927365024e-05,
+          0.012566157059711298
+        ],
+        "gross_desorption_range_mg_g": [
+          7.398104806484758e-05,
+          0.0017975543478260872
+        ],
+        "net_sorption_range_mg_g": [
+          -0.0017481654220404812,
+          0.012246157059711299
+        ]
+      },
+      "single_layer_response": {
+        "Qmax": {
+          "status": "PASS",
+          "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+          "max_paired_sorbed_N_error_mg_g": 6.938893903907228e-18,
+          "max_C_balance_g_cm3": 3.883086889066881e-18,
+          "max_N_balance_g_cm3": 3.671723424200647e-19,
+          "gross_adsorption_range_mg_g": [
+            1.0709524927365024e-05,
+            0.012566157059711298
+          ],
+          "gross_desorption_range_mg_g": [
+            7.398104806484758e-05,
+            0.0017975543478260872
+          ],
+          "net_sorption_range_mg_g": [
+            -0.0017481654220404812,
+            0.012246157059711299
+          ]
+        },
+        "Kba": {
+          "status": "PASS",
+          "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+          "max_paired_sorbed_N_error_mg_g": 6.938893903907228e-18,
+          "max_C_balance_g_cm3": 3.883086889066881e-18,
+          "max_N_balance_g_cm3": 3.671723424200647e-19,
+          "gross_adsorption_range_mg_g": [
+            1.0709524927365024e-05,
+            0.012566157059711298
+          ],
+          "gross_desorption_range_mg_g": [
+            7.398104806484758e-05,
+            0.0017975543478260872
+          ],
+          "net_sorption_range_mg_g": [
+            -0.0017481654220404812,
+            0.012246157059711299
+          ]
+        },
+        "Kdes_ref": {
+          "status": "PASS",
+          "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+          "max_paired_sorbed_N_error_mg_g": 6.938893903907228e-18,
+          "max_C_balance_g_cm3": 3.883086889066881e-18,
+          "max_N_balance_g_cm3": 3.671723424200647e-19,
+          "gross_adsorption_range_mg_g": [
+            1.0709524927365024e-05,
+            0.012566157059711298
+          ],
+          "gross_desorption_range_mg_g": [
+            7.398104806484758e-05,
+            0.0022832214765100664
+          ],
+          "net_sorption_range_mg_g": [
+            -0.0022434873670429557,
+            0.012246157059711299
+          ]
+        },
+        "source_top_down_layer": 29
+      },
+      "temperature_10_C": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+        "max_paired_sorbed_N_error_mg_g": 6.938893903907228e-18,
+        "max_C_balance_g_cm3": 7.731110832738558e-18,
+        "max_N_balance_g_cm3": 4.984315850678754e-19,
+        "gross_adsorption_range_mg_g": [
+          2.3438546110460223e-05,
+          0.006339568299625869
+        ],
+        "gross_desorption_range_mg_g": [
+          6.302465241141748e-05,
+          0.0013471519452940485
+        ],
+        "net_sorption_range_mg_g": [
+          -0.0013237133991835883,
+          0.006100074620462482
+        ]
+      },
+      "temperature_30_C": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 1.1102230246251565e-16,
+        "max_paired_sorbed_N_error_mg_g": 1.0408340855860843e-17,
+        "max_C_balance_g_cm3": 4.196381882113464e-18,
+        "max_N_balance_g_cm3": 4.29247077513341e-19,
+        "gross_adsorption_range_mg_g": [
+          2.6963546481731323e-05,
+          0.00729299310163203
+        ],
+        "gross_desorption_range_mg_g": [
+          0.00011038729547570686,
+          0.0023595284407932344
+        ],
+        "net_sorption_range_mg_g": [
+          -0.002332564894311503,
+          0.006873521378824344
+        ]
+      },
+      "zero_D": {
+        "status": "PASS",
+        "max_source_algebra_error_mg_g": 5.551115123125783e-17,
+        "max_paired_sorbed_N_error_mg_g": 3.469446951953614e-18,
+        "max_C_balance_g_cm3": 4.220367425078163e-18,
+        "max_N_balance_g_cm3": 3.686447239104091e-19,
+        "gross_adsorption_range_mg_g": [
+          0,
+          0
+        ],
+        "gross_desorption_range_mg_g": [
+          0.0012,
+          0.0012000000000000003
+        ],
+        "net_sorption_range_mg_g": [
+          -0.0012000000000000003,
+          -0.0012
+        ]
+      },
+      "layers": 58,
+      "PlantCN_enabled": false,
+      "production_kernel_changed": false,
+      "production_adapter_changed": false,
+      "D_and_Q_independent": true,
+      "original_hour_order_preserved": true,
+      "gross_exchange_and_capacity_response": true,
+      "temperature_response": true,
+      "accepted_inputs_unchanged": true
+    },
+    "standalone_public_entry_smoke": {
+      "status": "PASS",
+      "target_root": "<standalone-release>",
+      "output_root": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031",
+      "matlab_version": "25.1.0.2943329 (R2025a)",
+      "matlab_release": "2025a",
+      "jvm_enabled": true,
+      "resolved_production_sources": [
+        {
+          "entry": "run_site",
+          "file": "<standalone-release>\\run_site.m",
+          "sha256": "7d2fdff70e5a3d98df3897e55cdf4ee160b24dbad355020f4b61bbc412867d68"
+        },
+        {
+          "entry": "runCOMPASS",
+          "file": "<standalone-release>\\src\\runCOMPASS.m",
+          "sha256": "0f4c38809bd1a1855150d21982d0bc55da281746a40b9c38698a7ed1b65e4a40"
+        },
+        {
+          "entry": "init.initialize",
+          "file": "<standalone-release>\\src\\+init\\initialize.m",
+          "sha256": "c312191e93d000a600d2b3943db710a959e42f94191b8e0c946059447c9ef67c"
+        },
+        {
+          "entry": "io.checkSite",
+          "file": "<standalone-release>\\src\\+io\\checkSite.m",
+          "sha256": "c0ab711fa1e6d496bc685ae504b93e3fbdcbc87715a3a932ef3985b2c5a1491a"
+        },
+        {
+          "entry": "diagnostics.acceptedOrganicAudit",
+          "file": "<standalone-release>\\src\\+diagnostics\\acceptedOrganicAudit.m",
+          "sha256": "3cd1b33300584ed1fbf1ea6c363bc6a423524952bef9089d8174ceddca475ac2"
+        },
+        {
+          "entry": "diagnostics.writeStep",
+          "file": "<standalone-release>\\src\\+diagnostics\\writeStep.m",
+          "sha256": "3a45c3f737979c1abbf75a9ad66124037188aeb360cdb8e263fbdf15deb8a349"
+        },
+        {
+          "entry": "soil.microbe.advanceSourceCandidate",
+          "file": "<standalone-release>\\src\\+soil\\+microbe\\advanceSourceCandidate.m",
+          "sha256": "85b75647d095e96640b42724533f1e311b48052687bf585235c720b6fb3945f7"
+        },
+        {
+          "entry": "soil.nitrogen.tracer.advanceCandidate",
+          "file": "<standalone-release>\\src\\+soil\\+nitrogen\\+tracer\\advanceCandidate.m",
+          "sha256": "977697093eb243103ae9715f73a65e820199e8d4e0c62ae4a387dcb4a48cbb6b"
+        }
+      ],
+      "requested_steps": 4,
+      "accepted_steps": 4,
+      "elapsed_s": 60.4187101,
+      "public_entrypoint": "run_site('changwu') with MAX_KT override",
+      "normal_full_diagnostics": true,
+      "mend_flux_contract_count": 29,
+      "mend_flux_checks": [
+        {
+          "field": "POM1_decomp",
+          "registry_profile": "mend_pom1_decomp_profile",
+          "registry_column_rate": "mend_pom1_decomp_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "POM2_decomp",
+          "registry_profile": "mend_pom2_decomp_profile",
+          "registry_column_rate": "mend_pom2_decomp_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "POM1_to_DOM",
+          "registry_profile": "mend_pom1_to_dom_profile",
+          "registry_column_rate": "mend_pom1_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "POM2_to_DOM",
+          "registry_profile": "mend_pom2_to_dom_profile",
+          "registry_column_rate": "mend_pom2_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "POM1_to_MOM",
+          "registry_profile": "mend_pom1_to_mom_profile",
+          "registry_column_rate": "mend_pom1_to_mom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "POM2_to_MOM",
+          "registry_profile": "mend_pom2_to_mom_profile",
+          "registry_column_rate": "mend_pom2_to_mom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MOM_to_DOM",
+          "registry_profile": "mend_mom_to_dom_profile",
+          "registry_column_rate": "mend_mom_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "DOM_to_MBA",
+          "registry_profile": "mend_dom_to_mba_profile",
+          "registry_column_rate": "mend_dom_to_mba_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "CO2_growth",
+          "registry_profile": "mend_co2_growth_profile",
+          "registry_column_rate": "mend_co2_growth_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "CO2_maintenance_MBA",
+          "registry_profile": "mend_co2_maintenance_mba_profile",
+          "registry_column_rate": "mend_co2_maintenance_mba_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "CO2_maintenance_MBD",
+          "registry_profile": "mend_co2_maintenance_mbd_profile",
+          "registry_column_rate": "mend_co2_maintenance_mbd_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_mortality",
+          "registry_profile": "mend_mba_mortality_profile",
+          "registry_column_rate": "mend_mba_mortality_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_to_DOM",
+          "registry_profile": "mend_mba_to_dom_profile",
+          "registry_column_rate": "mend_mba_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_to_POM1",
+          "registry_profile": "mend_mba_to_pom1_profile",
+          "registry_column_rate": "mend_mba_to_pom1_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_to_POM2",
+          "registry_profile": "mend_mba_to_pom2_profile",
+          "registry_column_rate": "mend_mba_to_pom2_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_to_ENZP1",
+          "registry_profile": "mend_mba_to_enzp1_profile",
+          "registry_column_rate": "mend_mba_to_enzp1_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_to_ENZP2",
+          "registry_profile": "mend_mba_to_enzp2_profile",
+          "registry_column_rate": "mend_mba_to_enzp2_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_to_ENZM",
+          "registry_profile": "mend_mba_to_enzm_profile",
+          "registry_column_rate": "mend_mba_to_enzm_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "ENZP1_to_DOM",
+          "registry_profile": "mend_enzp1_to_dom_profile",
+          "registry_column_rate": "mend_enzp1_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "ENZP2_to_DOM",
+          "registry_profile": "mend_enzp2_to_dom_profile",
+          "registry_column_rate": "mend_enzp2_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "ENZM_to_DOM",
+          "registry_profile": "mend_enzm_to_dom_profile",
+          "registry_column_rate": "mend_enzm_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBA_to_MBD",
+          "registry_profile": "mend_mba_to_mbd_profile",
+          "registry_column_rate": "mend_mba_to_mbd_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "MBD_to_MBA",
+          "registry_profile": "mend_mbd_to_mba_profile",
+          "registry_column_rate": "mend_mbd_to_mba_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "DOM_to_QOM",
+          "registry_profile": "mend_dom_to_qom_profile",
+          "registry_column_rate": "mend_dom_to_qom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "QOM_to_DOM",
+          "registry_profile": "mend_qom_to_dom_profile",
+          "registry_column_rate": "mend_qom_to_dom_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "DOM_sorption_net",
+          "registry_profile": "mend_dom_sorption_net_profile",
+          "registry_column_rate": "mend_dom_sorption_net_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "ENZN_production",
+          "registry_profile": "mend_enzn_production_profile",
+          "registry_column_rate": "mend_enzn_production_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "ENZN_to_MBA",
+          "registry_profile": "mend_enzn_to_mba_profile",
+          "registry_column_rate": "mend_enzn_to_mba_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        },
+        {
+          "field": "N_overflow_CO2",
+          "registry_profile": "mend_n_overflow_co2_profile",
+          "registry_column_rate": "mend_n_overflow_co2_flux",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "native_rate_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\soil_organic.nc",
+          "finite_written": true
+        }
+      ],
+      "three_source_checks": [
+        {
+          "prefix": "fertilizer_tracer_",
+          "max_abs_column_closure_g_cm2": 0,
+          "original_tolerance_g_cm2": 2e-12,
+          "numerical_correction_g_cm2": 0,
+          "registry_residual": "fertilizer_tracer_cumulative_closure_residual",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\conservation.nc",
+          "finite_written": true
+        },
+        {
+          "prefix": "manure_organic_tracer_",
+          "max_abs_column_closure_g_cm2": 0,
+          "original_tolerance_g_cm2": 2e-12,
+          "numerical_correction_g_cm2": 0,
+          "registry_residual": "manure_organic_tracer_cumulative_closure_residual",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\conservation.nc",
+          "finite_written": true
+        },
+        {
+          "prefix": "manure_tan_tracer_",
+          "max_abs_column_closure_g_cm2": 0,
+          "original_tolerance_g_cm2": 2e-12,
+          "numerical_correction_g_cm2": 0,
+          "registry_residual": "manure_tan_tracer_cumulative_closure_residual",
+          "native_nc_file": "<standalone-release>\\data\\output\\sorption_release_smoke_20261031\\nc\\conservation.nc",
+          "finite_written": true
+        }
+      ],
+      "native_conservation": {
+        "status": "PASS",
+        "first_kt": 1,
+        "last_kt": 4,
+        "initialization_source": "resolved_organic_initial_pools_csv",
+        "full_budget": {
+          "schema_version": 1,
+          "units": "g element/cm2 ground",
+          "control_volume": "soil_column_plus_surface_AOM",
+          "coverage_complete": true,
+          "initial": {
+            "schema_version": 1,
+            "units": "g element/cm2 ground",
+            "carbon_pools_g_cm2": {
+              "POM1": 0.15967843010633068,
+              "POM2": 0.15967843010633068,
+              "MOC": 1.9407363332697734,
+              "MB": 0.013615734137499998,
+              "BD": 0.05446293654999999,
+              "ENZP1": 0.0003094485031250001,
+              "ENZP2": 0.0003094485031250001,
+              "EM": 0.0003094485031250001,
+              "ENZN": 0.0003094485031250001,
+              "IOM": 0.5371905914496778,
+              "NEC": 0,
+              "DOM": 0.22788478161788767,
+              "aom_litter_surface": 0,
+              "aom_litter_soil": 0,
+              "aom_straw_surface": 0,
+              "aom_straw_soil": 0,
+              "aom_manure_surface": 0,
+              "aom_manure_soil": 0,
+              "plant_labile": 0,
+              "plant_leaf": 0,
+              "plant_root_fine": 0,
+              "plant_livestem": 0,
+              "plant_deadstem": 0,
+              "plant_livecroot": 0,
+              "plant_deadcroot": 0,
+              "plant_fruit": 0,
+              "plant_root_storage": 0,
+              "plant_stem_storage": 0,
+              "transfer_leaf": 0,
+              "transfer_root": 0,
+              "transfer_livestem": 0,
+              "plant_xsmr_positive": 0
+            },
+            "nitrogen_pools_g_cm2": {
+              "PON1": 0.009979901881645659,
+              "PON2": 0.009979901881645659,
+              "MON": 0.2082046544800002,
+              "MB_N": 0.002032199125,
+              "BD_N": 0.0081287965,
+              "ENZP1_N": 9.67026572265625e-05,
+              "ENZP2_N": 9.67026572265625e-05,
+              "EM_N": 9.67026572265625e-05,
+              "ENZN_N": 9.67026572265625e-05,
+              "NEC": 0,
+              "DOM": 0.008657457008765898,
+              "aom_litter_surface": 0,
+              "aom_litter_soil": 0,
+              "aom_straw_surface": 0,
+              "aom_straw_soil": 0,
+              "aom_manure_surface": 0,
+              "aom_manure_soil": 0,
+              "nh4_dissolved_adsorbed": 0.004084489562300657,
+              "no3_dissolved": 0.006774905846301093,
+              "nh4_ice": 0,
+              "no3_ice": 0,
+              "nh4_granule": 0,
+              "urea": 0,
+              "plant_labile": 0,
+              "plant_leaf": 0,
+              "plant_root_fine": 0,
+              "plant_livestem": 0,
+              "plant_deadstem": 0,
+              "plant_livecroot": 0,
+              "plant_deadcroot": 0,
+              "plant_fruit": 0,
+              "plant_root_storage": 0,
+              "plant_stem_storage": 0,
+              "transfer_leaf": 0,
+              "transfer_root": 0,
+              "transfer_livestem": 0
+            },
+            "physical_carbon_g_cm2": 3.09448503125,
+            "nitrogen_g_cm2": 0.2582291169145654,
+            "plant_carbon_debt_g_cm2": 0,
+            "mend_respired_carbon_g_cm2": 0,
+            "accounting_carbon_g_cm2": 3.09448503125,
+            "plant_included": false,
+            "control_volume": "soil_column_plus_surface_AOM"
+          },
+          "final": {
+            "schema_version": 1,
+            "units": "g element/cm2 ground",
+            "carbon_pools_g_cm2": {
+              "POM1": 0.15967742092698653,
+              "POM2": 0.1596693273829826,
+              "MOC": 1.9407378110804796,
+              "MB": 0.013612015843020945,
+              "BD": 0.05446791244540847,
+              "ENZP1": 0.00030930417255030823,
+              "ENZP2": 0.0003093041724071569,
+              "EM": 0.0003093662591842273,
+              "ENZN": 0.0003092989226755087,
+              "IOM": 0.5371905914496778,
+              "NEC": 0,
+              "DOM": 0.22788919252348272,
+              "aom_litter_surface": 0,
+              "aom_litter_soil": 0,
+              "aom_straw_surface": 0,
+              "aom_straw_soil": 0,
+              "aom_manure_surface": 0,
+              "aom_manure_soil": 0,
+              "plant_labile": 0,
+              "plant_leaf": 0,
+              "plant_root_fine": 0,
+              "plant_livestem": 0,
+              "plant_deadstem": 0,
+              "plant_livecroot": 0,
+              "plant_deadcroot": 0,
+              "plant_fruit": 0,
+              "plant_root_storage": 0,
+              "plant_stem_storage": 0,
+              "transfer_leaf": 0,
+              "transfer_root": 0,
+              "transfer_livestem": 0,
+              "plant_xsmr_positive": 0
+            },
+            "nitrogen_pools_g_cm2": {
+              "PON1": 0.009979839101017046,
+              "PON2": 0.009979335599112077,
+              "MON": 0.20820470070976393,
+              "MB_N": 0.002031864685276446,
+              "BD_N": 0.008129546494770025,
+              "ENZP1_N": 9.665755392197131e-05,
+              "ENZP2_N": 9.665755387723654e-05,
+              "EM_N": 9.667695599507102e-05,
+              "ENZN_N": 9.665591333609647e-05,
+              "NEC": 0,
+              "DOM": 0.008657785214373846,
+              "aom_litter_surface": 0,
+              "aom_litter_soil": 0,
+              "aom_straw_surface": 0,
+              "aom_straw_soil": 0,
+              "aom_manure_surface": 0,
+              "aom_manure_soil": 0,
+              "nh4_dissolved_adsorbed": 0.0040862682998083315,
+              "no3_dissolved": 0.006776753645772072,
+              "nh4_ice": 0,
+              "no3_ice": 0,
+              "nh4_granule": 0,
+              "urea": 0,
+              "plant_labile": 0,
+              "plant_leaf": 0,
+              "plant_root_fine": 0,
+              "plant_livestem": 0,
+              "plant_deadstem": 0,
+              "plant_livecroot": 0,
+              "plant_deadcroot": 0,
+              "plant_fruit": 0,
+              "plant_root_storage": 0,
+              "plant_stem_storage": 0,
+              "transfer_leaf": 0,
+              "transfer_root": 0,
+              "transfer_livestem": 0
+            },
+            "physical_carbon_g_cm2": 3.0944815451788563,
+            "nitrogen_g_cm2": 0.25823274172702415,
+            "plant_carbon_debt_g_cm2": 0,
+            "mend_respired_carbon_g_cm2": 1.6017860323590755e-06,
+            "accounting_carbon_g_cm2": 3.0944815451788563,
+            "plant_included": false,
+            "control_volume": "soil_column_plus_surface_AOM"
+          },
+          "carbon_inputs_g_cm2": {
+            "organic_management": 0,
+            "doc_boundary": 0
+          },
+          "carbon_outputs_g_cm2": {
+            "aom_respiration": 0,
+            "mend_respiration": 1.6017860323590755e-06,
+            "doc_boundary": 1.8842851119288299e-06
+          },
+          "nitrogen_inputs_g_cm2": {
+            "organic_management": 0,
+            "mineral_fertilizer": 0,
+            "nh4_top": 0,
+            "nh4_bottom": 1.924063266649661e-06,
+            "no3_top": 0,
+            "no3_bottom": 2.0054349034472473e-06,
+            "don_boundary": 0
+          },
+          "nitrogen_outputs_g_cm2": {
+            "root_uptake": 0,
+            "ammonia_volatilization": 1.3873780446440148e-08,
+            "nitrification_n2o": 5.699217803397246e-09,
+            "denitrification_total": 1.093128477002321e-09,
+            "nh4_top": 0,
+            "nh4_bottom": 2.9077012421466194e-08,
+            "no3_top": 0,
+            "no3_bottom": 7.478250191356448e-08,
+            "don_boundary": 1.8016007029487783e-07
+          },
+          "carbon_physical_residual_g_cm2": 5.333622473259296e-16,
+          "nitrogen_residual_g_cm2": 6.635656108790189e-18,
+          "carbon_accounting_residual_g_cm2": 5.333622473259296e-16,
+          "carbon_debt_change_g_cm2": 0,
+          "carbon_debt_writeoff_g_cm2": 0,
+          "carbon_tolerance_g_cm2": 1e-10,
+          "nitrogen_tolerance_g_cm2": 1e-12,
+          "internal_transfer_residuals": {
+            "litter_carbon_g_cm2": 0,
+            "litter_nitrogen_g_cm2": 0,
+            "organic_source_carbon_g_cm2": 0,
+            "organic_source_nitrogen_g_cm2": 0,
+            "nitrification_product_g_cm2": -1.6543612251060553e-24
+          },
+          "internal_transfers_passed": true,
+          "carbon_physical_passed": true,
+          "carbon_accounting_passed": true,
+          "nitrogen_passed": true,
+          "writeoff_is_physical_input": false,
+          "component_residuals_used": false,
+          "plant_included": false,
+          "root_uptake_is_external_output": true,
+          "passed": true,
+          "status": "PASS"
+        },
+        "max_hourly_CN_residual_g_cm2": [
+          4.446488868699609e-16,
+          7.231827013825327e-17
+        ],
+        "max_interval_DIN_residual_ug_cm2": [
+          1.914690628268545e-12,
+          2.7327029528123603e-12
+        ],
+        "max_cumulative_DIN_residual_ug_cm2": [
+          1.6995294060961896e-12,
+          3.0038194154258235e-12
+        ],
+        "max_O2_residual_mol_cm2": 6.804652416657223e-19,
+        "cumulative_O2_residual_mol_cm2": -4.344815798271531e-19,
+        "final_soc_0_20_mgkg": 9458.947833464623,
+        "final_doc_free_0_20_mgkg": 240.28345614615077
+      },
+      "full_suite_run": false,
+      "annual_run_performed": false,
+      "site_or_source_modified": false,
+      "coverage_limit": "First June hours; this is an independent release smoke, not new September-event or annual validation"
+    },
+    "smoke_output_location": "Archived outside the distributable under local _23/validation/release_smoke_output; original receipt paths record execution locations",
+    "annual_run_performed": false,
+    "server_actions": false,
+    "ZIP_created": false
+  },
+  "csv_presentation_cleanup": {
+    "status": "PASS",
+    "encoding": "UTF-8 with BOM for Excel",
+    "files": [
+      "data/sites/changwu/soil.csv",
+      "data/sites/changwu/organic_initial_pools.csv"
+    ],
+    "leading_comments_per_file": 1,
+    "machine_header_and_data_bytes_unchanged": true,
+    "native_MATLAB_read_exact_for_all_four_tables": true,
+    "model_steps": 0,
+    "historical_comments": "docs/parameters/INPUT_HEADER_HISTORY.md",
+    "source_code_changed": false,
+    "ZIP_created": false
+  },
+  "aligned_parameter_meanings": {
+    "status": "PASS",
+    "format": "One Chinese meaning/unit row aligned with all columns, then the native English header, then data",
+    "soil_columns": 40,
+    "organic_pool_columns": 70,
+    "leading_comments_per_file": 1,
+    "encoding": "UTF-8 BOM",
+    "native_header_and_data_bytes_unchanged": true,
+    "native_MATLAB_table_comparison": "PASS, all four tables",
+    "model_steps": 0,
+    "source_code_changed": false
+  },
+  "input_layout_cleanup": {
+    "status": "PASS",
+    "soil_column_order": [
+      "depth_cm",
+      "clay_pct",
+      "sand_pct",
+      "msoc_mgkg",
+      "bulk_density_gcm3",
+      "ph",
+      "ks_cmd",
+      "theta_s",
+      "theta_r",
+      "vg_n",
+      "vg_alpha_1cm",
+      "difnh4_cm2d",
+      "difno3_cm2d",
+      "disp_cm",
+      "kg_cm3g",
+      "vmax_denit_ugn_cm3d",
+      "km_denit_ugn_cm3",
+      "kurea_1d",
+      "vmax_nit_ugn_cm3d",
+      "km_nit_ugn_cm3",
+      "k_nh4_dissolve_1d",
+      "kmineralization_1d",
+      "dom_disp_cm",
+      "mend_vd_pom_h",
+      "mend_ks_pom1_mg_g",
+      "mend_vg_h",
+      "mend_ks_dom_mg_g",
+      "mend_wdorm",
+      "mend_vnup_mb_h",
+      "mend_ks_nh4_mb_mg_g",
+      "mend_ks_no3_mb_mg_g",
+      "mend_qmax_mg_g",
+      "mend_kba_g_mg",
+      "mend_kdes_mg_g_h",
+      "kd_doc_cm3_g",
+      "kd_don_cm3_g",
+      "attachment_1d",
+      "detachment_1d",
+      "straining_1d",
+      "microbe_disp_cm"
+    ],
+    "soil_first20_columns_preserved": true,
+    "soil_all_named_value_literals_exact": true,
+    "TOML_all399_leaf_values_exact": true,
+    "TOML_sections_and_key_order_preserved": true,
+    "TOML_full_comment_lines_before": 268,
+    "TOML_full_comment_lines_after": 66,
+    "native_read_and_buildState_parameters_Y_byte_exact": true,
+    "source_code_changed": false,
+    "model_steps": 0,
+    "ZIP_created": false
+  },
+  "upstream_comment_restoration": {
+    "status": "PASS",
+    "original_comment_author": "Jizixing Zhu",
+    "winter_wheat_MEND_adaptation": "Wenjie Liu",
+    "upstream_reference_SHA256": "a45eaf056a11fcf590c8c1ba6a1c95e542db85a802f70ba85da71c9bc1b18042",
+    "restored_comment_blocks": 41,
+    "all_noncomment_code_lines_exact": true,
+    "all399_TOML_values_exact": true,
+    "native_TOML_parsing_and_serialized_values_exact": true,
+    "soil_and_organic_CSV_bytes_unchanged": true,
+    "apple_specific_notes_imported": false,
+    "source_code_changed": false,
+    "model_steps": 0,
+    "ZIP_created": false
+  }
+}

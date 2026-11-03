@@ -1,0 +1,34 @@
+# Runtime products and local environments
+/data/output/
+/data/output_*/
+/data/verification/
+/output/
+/outputs/
+/logs/
+*.log
+*.asv
+*.m~
+*.tmp
+*.bak
+*.zip
+matlab_crash_dump.*
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.env
+.env.*
+.claude/settings.local.json
+# Only the site inputs are tracked under data/; model libraries, global
+# reference data and run products stay local.
+/data/*
+!/data/sites/
+
+# Personal literature-reading material is not site input.
+data/sites/*/最近读文献/
+
+# Input CSV/XLSX are intentionally included.

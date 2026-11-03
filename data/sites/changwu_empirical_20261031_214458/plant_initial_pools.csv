@@ -1,0 +1,12 @@
+﻿# Plant C/N pool initial state used to construct prognostic Y0.,,
+# Winter-wheat run starts after harvest; only the retained seed reserve is present.,,
+# At CoLM crop emergence the seed reserve transfers to leaf display pools.,,
+pool,value,unit
+C_labile,0,gC/m2
+C_leaf,0,gC/m2
+C_root_fine,0,gC/m2
+C_stem_wood,0,gC/m2
+C_fruit,3,gC/m2
+N_fruit,0.15,gN/m2
+N_storage,0,gN/m2
+C_storage,0,gC/m2
